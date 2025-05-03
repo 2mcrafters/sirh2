@@ -50,6 +50,9 @@ Route::get('/export-absence-requests', [AbsenceRequestExcelController::class, 'e
 Route::get('/export-pointages', [PointageExcelController::class, 'exportPointages']);
 Route::get('/export-departements', [DepartementExcelController::class, 'exportDepartements']);
 
+
+
+
 Route::middleware(['auth:sanctum', 'role:RH'])->group(function () {
     Route::post('/assign-role', [AuthController::class, 'assignRole']);
     Route::get('/user_permission', function () {
