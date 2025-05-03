@@ -6,6 +6,8 @@ import { fetchUsers } from '../Redux/Slices/userSlice';
 import { Icon } from '@iconify/react/dist/iconify.js';
 import Swal from 'sweetalert2';
 
+
+
 const AbsenceRequestsListPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -18,6 +20,13 @@ const AbsenceRequestsListPage = () => {
   const [type, setType] = useState('');
   const [status, setStatus] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+ 
+  const roles = useSelector((state) => state.auth.roles || []);
+  const isEmployee = roles.includes('EMPLOYE');  // Vérifie si le rôle est "EMPLOYE"
+ 
+ 
+
 
   useEffect(() => {
     dispatch(fetchAbsenceRequests());
@@ -97,6 +106,27 @@ const AbsenceRequestsListPage = () => {
         );
       }
     }
+  };
+
+
+  const handleExport = () => {
+    api.get('http://localhost:8000/api/export-absence-requests', {
+      responseType: 'blob',
+      headers: {
+        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }
+    })
+    .then((response) => {
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'absences.xlsx');
+      document.body.appendChild(link);
+      link.click();
+    })
+    .catch((error) => {
+      console.error('Erreur lors de l’exportation :', error);
+    });
   };
 
   const handleBulkDelete = async () => {
@@ -184,6 +214,7 @@ const AbsenceRequestsListPage = () => {
         <h5 className="card-title mb-0">Demandes d'absence</h5>
 
         <div className="d-flex flex-wrap gap-2">
+          
           <Link to="/absences/add" className="btn btn-primary d-flex align-items-center">
             <Icon icon="mdi:plus" />
             <span className="d-none d-md-inline ms-1">Ajouter</span>
@@ -198,15 +229,20 @@ const AbsenceRequestsListPage = () => {
             <span className="d-none d-md-inline ms-1">Supprimer</span>
           </button>
 
-          <button className="btn btn-outline-secondary d-flex align-items-center">
+
+        {!isEmployee && (
+          <button className="btn btn-outline-secondary d-flex align-items-center"
+          onClick={handleExport} >
             <Icon icon="mdi:download" />
             <span className="d-none d-md-inline ms-1">Export</span>
           </button>
-
+        )}
+         {!isEmployee && (
           <button className="btn btn-outline-secondary d-flex align-items-center">
             <Icon icon="mdi:upload" />
             <span className="d-none d-md-inline ms-1">Import</span>
           </button>
+         )}
 
           <button
             className="btn btn-outline-secondary d-inline d-md-none"

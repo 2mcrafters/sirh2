@@ -5,6 +5,8 @@ import { fetchUsers, deleteUsers } from '../Redux/Slices/userSlice';
 import { fetchDepartments } from '../Redux/Slices/departementSlice';
 import { Icon } from '@iconify/react/dist/iconify.js';
 import Swal from 'sweetalert2';
+import api from '../config/axios';
+
 
 const UsersListPage = () => {
   const dispatch = useDispatch();
@@ -19,6 +21,10 @@ const UsersListPage = () => {
   const [department, setDepartment] = useState('');
   const [status, setStatus] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  const roles = useSelector((state) => state.auth.roles || []);
+  const isEmployee = roles.includes('EMPLOYE');  // Vérifie si le rôle est "EMPLOYE"
+
 
   useEffect(() => {
     dispatch(fetchUsers());
@@ -99,6 +105,61 @@ const UsersListPage = () => {
       }
     }
   };
+
+
+ 
+
+  const handleExportEmployes = async () => {
+    try {
+      
+      const response = await api.get('/export-employes', {
+        responseType: 'blob', 
+      });
+  
+      
+      const link = document.createElement('a');
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      link.href = url;
+      link.setAttribute('download', 'employes.xlsx'); 
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Erreur lors de l’exportation des employés:', error);
+    }
+  };
+  
+
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0]; 
+    
+    if (!file) {
+      Swal.fire('Erreur', 'Veuillez sélectionner un fichier', 'error');
+      return;
+    }
+  
+    const formData = new FormData();
+    formData.append('file', file);
+  
+    try {
+      
+      const response = await api.post('/import-employes', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data', 
+        },
+      });
+  
+      if (response.status === 200) {
+        Swal.fire('Succès', 'Fichier importé avec succès', 'success');
+        // Perform any additional actions if needed (e.g., refreshing data or resetting state)
+      }
+    } catch (error) {
+      console.error('Erreur lors de l’importation des employés:', error);
+      Swal.fire('Erreur', 'Une erreur est survenue lors de l’importation du fichier', 'error');
+    }
+  };
+  
 
   const handleBulkDelete = async () => {
     if (selectedUsers.length === 0) {
@@ -185,11 +246,15 @@ const UsersListPage = () => {
         <h5 className="card-title mb-0">Utilisateurs</h5>
 
         <div className="d-flex flex-wrap gap-2">
+        {!isEmployee && (
           <Link to="/users/add" className="btn btn-primary d-flex align-items-center">
             <Icon icon="mdi:plus" />
             <span className="d-none d-md-inline ms-1">Ajouter</span>
           </Link>
+        )}
+ 
 
+ {!isEmployee && (
           <button 
             className="btn btn-danger d-flex align-items-center"
             onClick={handleBulkDelete}
@@ -198,23 +263,40 @@ const UsersListPage = () => {
             <Icon icon="mdi:trash" />
             <span className="d-none d-md-inline ms-1">Supprimer</span>
           </button>
+ )}
 
-          <button className="btn btn-outline-secondary d-flex align-items-center">
+{!isEmployee && (
+          <button className="btn btn-outline-secondary d-flex align-items-center"
+          onClick={handleExportEmployes}>
             <Icon icon="mdi:download" />
             <span className="d-none d-md-inline ms-1">Export</span>
           </button>
 
-          <button className="btn btn-outline-secondary d-flex align-items-center">
-            <Icon icon="mdi:upload" />
-            <span className="d-none d-md-inline ms-1">Import</span>
-          </button>
+)}
 
+{!isEmployee && (     
+          <button
+            className="btn btn-outline-secondary d-flex align-items-center"
+            onClick={() => document.getElementById('fileInput').click()}
+          >
+          <Icon icon="mdi:upload" />
+          <span className="d-none d-md-inline ms-1">Import</span>
+          <input
+            type="file"
+            id="fileInput"
+            style={{ display: 'none' }}
+            onChange={handleImport}
+            accept=".csv, .xlsx"
+          />
+          </button>
+)}
           <button
             className="btn btn-outline-secondary d-inline d-md-none"
             onClick={() => setFiltersOpen(!filtersOpen)}
           >
             <Icon icon="mdi:tune" />
           </button>
+
         </div>
       </div>
 

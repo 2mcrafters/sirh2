@@ -1,7 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api from '../../config/axios';  
 
-
 export const fetchDepartments = createAsyncThunk(
   'departments/fetchAll',
   async (_, { rejectWithValue }) => {
@@ -58,6 +57,24 @@ export const deleteDepartments = createAsyncThunk(
       return ids;
     } catch (error) {
       return rejectWithValue(error.response.data);
+    }
+  }
+);
+
+// Action pour l'import des départements
+export const importDepartments = createAsyncThunk(
+  'departments/import',
+  async (formData, { rejectWithValue }) => {
+    try {
+      const response = await api.post("/departements/import", formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error importing departments:', error.response?.data);
+      return rejectWithValue(error.response?.data || 'An error occurred');
     }
   }
 );
@@ -122,8 +139,20 @@ const departmentSlice = createSlice({
       .addCase(deleteDepartments.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
+      })
+      // Import departments
+      .addCase(importDepartments.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(importDepartments.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.items = action.payload; // Assuming the imported data is returned in the response
+      })
+      .addCase(importDepartments.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
       });
   }
 });
 
-export default departmentSlice.reducer; 
+export default departmentSlice.reducer;

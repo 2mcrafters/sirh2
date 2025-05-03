@@ -99,9 +99,6 @@ export const updateUser = createAsyncThunk(
   }
 );
 
-
-
-
 export const deleteUsers = createAsyncThunk(
   'users/deleteUsers',
   async (ids, { rejectWithValue }) => {
@@ -110,6 +107,26 @@ export const deleteUsers = createAsyncThunk(
       return ids;
     } catch (error) {
       return rejectWithValue(error.response.data);
+    }
+  }
+);
+
+// Import users
+export const importUsers = createAsyncThunk(
+  'users/importUsers',
+  async (file, { rejectWithValue }) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await axios.post(API_ENDPOINTS.USERS.IMPORT, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
@@ -174,8 +191,20 @@ const userSlice = createSlice({
       .addCase(deleteUsers.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
+      })
+      // Import users
+      .addCase(importUsers.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(importUsers.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.items = [...state.items, ...action.payload];
+      })
+      .addCase(importUsers.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
       });
   }
 });
 
-export default userSlice.reducer; 
+export default userSlice.reducer;

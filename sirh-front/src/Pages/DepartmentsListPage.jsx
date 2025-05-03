@@ -15,6 +15,11 @@ const DepartmentsListPage = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
 
+
+  const roles = useSelector((state) => state.auth.roles || []);
+  const isEmployee = roles.includes('EMPLOYE');  // Vérifie si le rôle est "EMPLOYE"
+   
+
   useEffect(() => {
     dispatch(fetchDepartments());
   }, [dispatch]);
@@ -59,6 +64,72 @@ const DepartmentsListPage = () => {
     
     return pageNumbers;
   };
+
+
+
+  const handleExportDepartements = () => {
+    api.get('http://localhost:8000/api/export-departements', {
+      responseType: 'blob',
+      headers: {
+        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }
+    })
+    .then((response) => {
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'departements.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    })
+    .catch((error) => {
+      console.error('Erreur lors de l’exportation des départements :', error);
+    });
+  };
+
+
+
+  const handleImportDepartments = async (e) => {
+    const file = e.target.files[0];  // Récupérer le fichier sélectionné
+  
+    if (!file) {
+      Swal.fire(
+        'Erreur!',
+        'Aucun fichier sélectionné.',
+        'error'
+      );
+      return;
+    }
+  
+    const formData = new FormData();
+    formData.append('file', file); 
+  
+    try {
+     
+      const response = await api.post('http://localhost:8000/api/import-departements', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data', 
+        }
+      });
+  
+      Swal.fire(
+        'Succès!',
+        'Les départements ont été importés avec succès.',
+        'success'
+      );
+  
+     
+      dispatch(fetchDepartments());
+    } catch (error) {
+      Swal.fire(
+        'Erreur!',
+        'Une erreur est survenue lors de l\'importation des départements.',
+        'error'
+      );
+    }
+  };
+  
 
   const handleEdit = (id) => {
     navigate(`/departments/${id}/edit`);
@@ -179,11 +250,13 @@ const DepartmentsListPage = () => {
         <h5 className="card-title mb-0">Départements</h5>
 
         <div className="d-flex flex-wrap gap-2">
+        {!isEmployee && (
           <Link to="/creer-departement" className="btn btn-primary d-flex align-items-center">
             <Icon icon="mdi:plus" />
             <span className="d-none d-md-inline ms-1">Ajouter</span>
           </Link>
-
+        )}
+         {!isEmployee && (
           <button 
             className="btn btn-danger d-flex align-items-center"
             onClick={handleBulkDelete}
@@ -192,16 +265,35 @@ const DepartmentsListPage = () => {
             <Icon icon="mdi:trash" />
             <span className="d-none d-md-inline ms-1">Supprimer</span>
           </button>
+         )}
 
-          <button className="btn btn-outline-secondary d-flex align-items-center">
+{!isEmployee && (
+          <button className="btn btn-outline-secondary d-flex align-items-center" 
+          onClick={handleExportDepartements}>
             <Icon icon="mdi:download" />
             <span className="d-none d-md-inline ms-1">Export</span>
           </button>
+)}
 
-          <button className="btn btn-outline-secondary d-flex align-items-center">
+         
+        {!isEmployee && (
+          <button
+            className="btn btn-outline-secondary d-flex align-items-center"
+            onClick={() => document.getElementById('fileInput').click()}  
+          >
             <Icon icon="mdi:upload" />
             <span className="d-none d-md-inline ms-1">Import</span>
           </button>
+        )}
+          <input
+            type="file"
+            id="fileInput"
+            style={{ display: 'none' }}
+            accept=".xlsx, .xls, .csv"  
+            onChange={handleImportDepartments}  
+          />
+        
+
 
           <button
             className="btn btn-outline-secondary d-inline d-md-none"
