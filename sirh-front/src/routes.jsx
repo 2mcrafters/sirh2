@@ -13,6 +13,7 @@ import EditAbsenceRequestPage from './Pages/EditAbsenceRequestPage';
 import PointagesListPage from './Pages/PointagesListPage';
 import AddPointagePage from './Pages/AddPointagePage';
 import EditPointagePage from './Pages/EditPointagePage';
+import ProtectedEditRoute from './Components/ProtectedEditRoute';
 
 const AppRoutes = () => {
   return (
@@ -24,7 +25,10 @@ const AppRoutes = () => {
         <Route path="departments/:id/edit" element={<EditDepartmentPage />} />
         <Route path="users" element={<UsersListPage />} />
         <Route path="users/add" element={<UserFormPage />} />
-        <Route path="users/:id/edit" element={<UserFormPage />} />
+        <Route 
+          path="users/:id/edit" 
+          element={<ProtectedEditRoute component={UserFormPage} />} 
+        />
         <Route path="absences" element={<AbsenceRequestsListPage />} />
         <Route path="absences/add" element={<AddAbsenceRequestPage />} />
         <Route path="absences/:id/edit" element={<EditAbsenceRequestPage />} />

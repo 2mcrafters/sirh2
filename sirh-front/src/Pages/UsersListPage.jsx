@@ -11,6 +11,7 @@ const UsersListPage = () => {
   const navigate = useNavigate();
   const { items: users, status: loading, error } = useSelector((state) => state.users);
   const { items: departments } = useSelector((state) => state.departments);
+  const { user: currentUser } = useSelector((state) => state.auth); // Ajout de l'utilisateur connecté
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -67,6 +68,16 @@ const UsersListPage = () => {
   };
 
   const handleEdit = (id) => {
+    // Empêcher la modification si c'est l'utilisateur connecté
+    if (currentUser && currentUser.id === id) {
+      Swal.fire({
+        title: 'Action non autorisée',
+        text: 'Vous ne pouvez pas modifier votre profil depuis cette page. Veuillez utiliser la page de profil.',
+        icon: 'warning',
+        confirmButtonText: 'OK'
+      });
+      return;
+    }
     navigate(`/users/${id}/edit`);
   };
 
@@ -292,6 +303,7 @@ const UsersListPage = () => {
             <tbody>
               {currentItems.map((user) => {
                 const department = departments.find(d => d.id === user.departement_id);
+                const isCurrentUser = currentUser && currentUser.id === user.id;
                 return (
                   <tr key={user.id}>
                     <td>
@@ -311,9 +323,10 @@ const UsersListPage = () => {
                     <td className="text-end">
                       <div className="d-flex justify-content-end gap-2">
                         <button
-                          className="btn btn-sm btn-primary me-2"
+                          className={`btn btn-sm ${isCurrentUser ? 'btn-secondary' : 'btn-primary'} me-2`}
                           onClick={() => handleEdit(user.id)}
-                          title="Modifier"
+                          title={isCurrentUser ? "Utilisez la page de profil pour modifier vos informations" : "Modifier"}
+                          disabled={isCurrentUser}
                         >
                           <Icon icon="mdi:pencil" />
                         </button>
@@ -380,4 +393,4 @@ const UsersListPage = () => {
   );
 };
 
-export default UsersListPage; 
+export default UsersListPage;

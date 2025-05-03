@@ -6,14 +6,21 @@ import api from '../../config/axios';
 // Async thunks
 export const fetchUsers = createAsyncThunk(
   'users/fetchUsers',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
       const response = await api.get(API_ENDPOINTS.USERS.BASE, {
         params: {
           include: 'departement'
         }
       });
-      return response.data;
+      
+      // Récupérer l'utilisateur connecté depuis le state
+      const currentUser = getState().auth.user;
+      
+      // Filtrer l'utilisateur connecté de la liste
+      const filteredUsers = response.data.filter(user => user.id !== currentUser?.id);
+      
+      return filteredUsers;
     } catch (error) {
       return rejectWithValue(error.response.data);
     }
@@ -178,4 +185,4 @@ const userSlice = createSlice({
   }
 });
 
-export default userSlice.reducer; 
+export default userSlice.reducer;

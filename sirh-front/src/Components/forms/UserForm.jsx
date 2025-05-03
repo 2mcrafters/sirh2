@@ -132,28 +132,29 @@ const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
     return role.toUpperCase();
   };
 
+  const defaultValues = {
+    cin: '',
+    rib: '',
+    situationFamiliale: 'Célibataire',
+    nbEnfants: 0,
+    adresse: '',
+    name: '',
+    prenom: '',
+    tel: '',
+    email: '',
+    role: '',
+    typeContrat: 'Permanent',
+    date_naissance: '',
+    statut: 'Actif',
+    departement_id: '',
+    ...initialValues
+  };
+
   return (
     <Formik
-      initialValues={{
-        cin: '',
-        rib: '',
-        situationFamiliale: 'Célibataire',
-        nbEnfants: 0,
-        adresse: '',
-        name: '',
-        prenom: '',
-        tel: '',
-        email: '',
-        password: undefined,
-        role: isEdit ? normalizeRole(initialValues.role) : 'Employe',
-        typeContrat: 'Permanent',
-        date_naissance: '',
-        statut: 'Actif',
-        departement_id: '',
-        picture: null,
-        ...initialValues
-      }}
+      initialValues={defaultValues}
       validationSchema={validationSchema}
+      enableReinitialize={true}
       onSubmit={handleSubmit}
     >
       {({ isSubmitting, setFieldValue }) => (
@@ -414,4 +415,4 @@ const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
   );
 };
 
-export default UserForm; 
+export default UserForm;
