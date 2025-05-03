@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { updateUser } from '../Redux/Slices/userSlice'; 
 
 const ViewProfileLayer = () => {
+  const apiUrl = import.meta.env.VITE_API_URL;
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const { status, error } = useSelector((state) => state.users);
@@ -11,8 +12,13 @@ const ViewProfileLayer = () => {
   // État local pour le formulaire
   const [formData, setFormData] = useState({});
   const [imagePreview, setImagePreview] = useState(
-    user?.profile_picture || "assets/images/user-grid/user-grid-img13.png"
+    user?.picture
+      ? `${apiUrl}storage/profile_picture/${user.picture}`
+      : "assets/images/user-grid/user-grid-img13.png"
   );
+  
+ 
+  
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [profilePicture, setProfilePicture] = useState(null);
@@ -149,7 +155,7 @@ const ViewProfileLayer = () => {
       <div className='col-lg-4'>
         <div className='user-grid-card position-relative border radius-16 overflow-hidden bg-base h-100'>
           <img
-            src='assets/images/user-grid/user-grid-bg1.png'
+            src='https://img.freepik.com/free-photo/millennial-asia-businessmen-businesswomen-meeting-brainstorming-ideas-about-new-paperwork-project-colleagues-working-together-planning-success-strategy-enjoy-teamwork-small-modern-night-office_7861-2386.jpg?t=st=1746285329~exp=1746288929~hmac=3fcf64f9159186b3557a7aa18cbf39589dad8764d99a98898010e57c933bfd79&w=1380'
             alt='WowDash React Vite'
             className='w-100 object-fit-cover'
           />

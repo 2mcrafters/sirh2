@@ -206,7 +206,6 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
                       onChange={(event) => {
                         const file = event.currentTarget.files[0];
                         if (file) {
-                          console.log('Selected file:', file);
                           setFieldValue("justification", file);
                         } else {
                           setFieldValue("justification", null);

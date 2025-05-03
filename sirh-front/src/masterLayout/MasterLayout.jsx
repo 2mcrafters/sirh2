@@ -11,7 +11,6 @@ import { useSelector } from "react-redux";
 const MasterLayout = ({ children }) => {
   const roles = useSelector((state) => state.auth.roles || []);
 
-  console.log('Current roles:', roles);
 
   let [sidebarActive, seSidebarActive] = useState(false);
   let [mobileMenu, setMobileMenu] = useState(false);

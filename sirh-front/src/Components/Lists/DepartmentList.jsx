@@ -126,11 +126,9 @@ const DepartmentList = () => {
   };
 
   const handleExport = () => {
-    console.log('Export departments');
   };
 
   const handleImport = () => {
-    console.log('Import departments');
   };
 
   const toggleColumnVisibility = (columnKey) => {

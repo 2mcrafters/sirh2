@@ -18,7 +18,35 @@ import AddPointagePage from './Pages/AddPointagePage'
 import EditPointagePage from './Pages/EditPointagePage'
 import "./degrade.css"
 
+
+//fetch slices
+import { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchUsers } from './Redux/Slices/userSlice';
+import { fetchDepartments } from './Redux/Slices/departementSlice';
+import { fetchAbsenceRequests } from './Redux/Slices/absenceRequestSlice';
+import { fetchPointages } from './Redux/Slices/pointageSlice';
+import { fetchPresenceStats } from './Redux/Slices/presenceStatsSlice';
+
+
 function App() {
+
+  const dispatch = useDispatch();
+  const auth = useSelector((state) => state.auth);
+
+  useEffect(() => {
+    if (auth.isSuccess && auth.token) {
+      dispatch(fetchUsers());
+      dispatch(fetchDepartments());
+      dispatch(fetchAbsenceRequests());
+      dispatch(fetchPointages());
+      // dispatch(fetchPresenceStats());
+      
+    }
+  }, [auth.isSuccess, auth.token, dispatch]);
+
+
+
   return (
     <AuthProvider>
       <Routes>

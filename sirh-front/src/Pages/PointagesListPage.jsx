@@ -52,7 +52,7 @@ const PointagesListPage = () => {
           date: selectedDate,
           heureEntree: existingPointage?.heureEntree || '',
           heureSortie: existingPointage?.heureSortie || '',
-          statutJour: existingPointage?.statutJour || 'present',
+          statutJour: existingPointage?.statutJour || '',
           overtimeHours: existingPointage?.overtimeHours || 0
         };
       });
@@ -374,11 +374,22 @@ const PointagesListPage = () => {
     try {
       const updates = Object.values(editablePointages)
         .filter(pointage => {
-          
-          return pointage.statutJour !== 'present' || 
-                 pointage.heureEntree || 
-                 pointage.heureSortie || 
-                 pointage.overtimeHours;
+          // Get the original pointage if it exists
+          const originalPointage = pointages.find(p => 
+            p.user_id === pointage.user_id && 
+            new Date(p.date).toISOString().split('T')[0] === selectedDate
+          );
+
+          // If no original pointage exists, save it
+          if (!originalPointage) return true;
+
+          // If any field has changed, save it
+          return (
+            originalPointage.statutJour !== pointage.statutJour ||
+            originalPointage.heureEntree !== pointage.heureEntree ||
+            originalPointage.heureSortie !== pointage.heureSortie ||
+            originalPointage.overtimeHours !== pointage.overtimeHours
+          );
         })
         .map(pointage => {
           const pointageData = {
@@ -547,9 +558,9 @@ const PointagesListPage = () => {
             <thead>
               <tr>
                 <th>Employé</th>
+                <th>Statut</th>
                 <th>Heure d'entrée</th>
                 <th>Heure de sortie</th>
-                <th>Statut</th>
                 <th>Heures supplémentaires</th>
                 <th>Actions</th>
               </tr>
@@ -559,13 +570,6 @@ const PointagesListPage = () => {
                 const pointage = editablePointages[user.id] || {};
                 const isOnLeave = isUserOnLeave(user.id);
                 const leaveInfo = getLeaveInfo(user.id);
-                
-                console.log('Rendering user:', {
-                  userId: user.id,
-                  userName: `${user.name} ${user.prenom}`,
-                  isOnLeave,
-                  leaveInfo
-                });
                 
                 return (
                   <tr key={user.id}>
@@ -581,6 +585,30 @@ const PointagesListPage = () => {
                           </small>
                         </span>
                       )}
+                    </td>
+                    <td>
+                      <select
+                        className={`form-select ${
+                          pointage.statutJour === 'present' ? 'text-success' :
+                          pointage.statutJour === 'absent' ? 'text-danger' :
+                          pointage.statutJour === 'retard' ? 'text-warning' : ''
+                        }`}
+                        value={pointage.statutJour || ''}
+                        onChange={(e) => {
+                          const newStatus = e.target.value;
+                          handleFieldChange(user.id, 'statutJour', newStatus);
+                          if (newStatus === 'absent') {
+                            handleFieldChange(user.id, 'heureEntree', '');
+                            handleFieldChange(user.id, 'heureSortie', '');
+                          }
+                        }}
+                        disabled={isOnLeave}
+                      >
+                        <option value="">Sélectionner un statut</option>
+                        <option value="present" className="text-success">Présent</option>
+                        <option value="absent" className="text-danger">Absent</option>
+                        <option value="retard" className="text-warning">Retard</option>
+                      </select>
                     </td>
                     <td>
                       <input
@@ -599,29 +627,6 @@ const PointagesListPage = () => {
                         onChange={(e) => handleFieldChange(user.id, 'heureSortie', e.target.value)}
                         disabled={pointage.statutJour === 'absent' || isOnLeave}
                       />
-                    </td>
-                    <td>
-                      <select
-                        className={`form-select ${
-                          pointage.statutJour === 'present' ? 'text-success' :
-                          pointage.statutJour === 'absent' ? 'text-danger' :
-                          pointage.statutJour === 'retard' ? 'text-warning' : ''
-                        }`}
-                        value={pointage.statutJour || 'present'}
-                        onChange={(e) => {
-                          const newStatus = e.target.value;
-                          handleFieldChange(user.id, 'statutJour', newStatus);
-                          if (newStatus === 'absent') {
-                            handleFieldChange(user.id, 'heureEntree', '');
-                            handleFieldChange(user.id, 'heureSortie', '');
-                          }
-                        }}
-                        disabled={isOnLeave}
-                      >
-                        <option value="present" className="text-success">Présent</option>
-                        <option value="absent" className="text-danger">Absent</option>
-                        <option value="retard" className="text-warning">Retard</option>
-                      </select>
                     </td>
                     <td>
                       <input

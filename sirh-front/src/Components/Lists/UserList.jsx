@@ -10,8 +10,7 @@ const UserList = () => {
   const { items: users = [], status = 'idle' } = useSelector(state => state.users || {});
   
   // Debug logs
-  console.log('Users state:', users);
-  console.log('Status:', status);
+
 
   const [visibleColumns, setVisibleColumns] = useState({
     id: true,
@@ -25,7 +24,6 @@ const UserList = () => {
 
   useEffect(() => {
     dispatch(fetchUsers());
-    console.log(users);
   }, [dispatch]);
 
   const columns = [
@@ -119,15 +117,12 @@ const UserList = () => {
   };
 
   const handleDelete = (id) => {
-    console.log('Delete user:', id);
   };
 
   const handleExport = () => {
-    console.log('Export users');
   };
 
   const handleImport = () => {
-    console.log('Import users');
   };
 
   const toggleColumnVisibility = (columnKey) => {
@@ -137,8 +132,6 @@ const UserList = () => {
     }));
   };
 
-  // Debug log for data being passed to TableDataLayer
-  console.log('Data being passed to TableDataLayer:', users);
 
   return (
     <TableDataLayer
