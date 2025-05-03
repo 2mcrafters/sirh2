@@ -1,16 +1,56 @@
-
-
 import { Icon } from "@iconify/react/dist/iconify.js";
-import { useState } from "react";
-import { useSelector } from 'react-redux';
+import { useState, useEffect } from "react";
+import { useSelector, useDispatch } from 'react-redux';
+import { updateUser } from '../Redux/Slices/userSlice'; 
 
 const ViewProfileLayer = () => {
+  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+  const { status, error } = useSelector((state) => state.users);
+  
+  // État local pour le formulaire
+  const [formData, setFormData] = useState({});
   const [imagePreview, setImagePreview] = useState(
     user?.profile_picture || "assets/images/user-grid/user-grid-img13.png"
   );
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+  const [profilePicture, setProfilePicture] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
+  // Initialiser le formulaire avec les données utilisateur
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        prenom: user.prenom || '',
+        email: user.email || '',
+        tel: user.tel || '',
+        departement_id: user.departement_id || '',
+        statut: user.statut || '',
+        date_naissance: user.date_naissance || '',
+        rib: user.rib || '',
+        cin: user.cin || '',
+        situationFamiliale: user.situationFamiliale || '',
+        nbEnfants: user.nbEnfants || 0,
+        adresse: user.adresse || '',
+        typeContrat: user.typeContrat || '',
+        role: user.role || ''
+      });
+    }
+  }, [user]);
+
+  // Gestion des changements dans le formulaire
+  const handleInputChange = (e) => {
+    const { id, value } = e.target;
+    setFormData({
+      ...formData,
+      [id]: value
+    });
+  };
 
   // Toggle function for password field
   const togglePasswordVisibility = () => {
@@ -21,14 +61,83 @@ const ViewProfileLayer = () => {
     setConfirmPasswordVisible(!confirmPasswordVisible);
   };
 
+  // Gestion de l'upload d'image
   const readURL = (input) => {
     if (input.target.files && input.target.files[0]) {
+      const file = input.target.files[0];
+      setProfilePicture(file);
+      
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target.result);
       };
-      reader.readAsDataURL(input.target.files[0]);
+      reader.readAsDataURL(file);
     }
+  };
+
+  // Soumission du formulaire de profil
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    // Préparer les données pour la mise à jour
+    const updateData = {
+      id: user.id,
+      ...formData
+    };
+    
+    // Ajouter l'image si elle a été modifiée
+    if (profilePicture) {
+      updateData.picture = profilePicture;
+    }
+    
+    // Dispatcher l'action de mise à jour
+    dispatch(updateUser(updateData))
+      .unwrap()
+      .then(() => {
+        setSuccessMessage("Profil mis à jour avec succès!");
+        setTimeout(() => setSuccessMessage(""), 3000);
+      })
+      .catch((err) => {
+        console.error("Erreur lors de la mise à jour:", err);
+      });
+  };
+
+  // Soumission du formulaire de mot de passe
+  const handlePasswordChange = (e) => {
+    e.preventDefault();
+    
+    // Validation des mots de passe
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Les mots de passe ne correspondent pas");
+      return;
+    }
+    
+    if (newPassword.length < 8) {
+      setPasswordError("Le mot de passe doit contenir au moins 8 caractères");
+      return;
+    }
+    
+    // Réinitialiser l'erreur
+    setPasswordError("");
+    
+    // Préparer les données pour la mise à jour
+    const updateData = {
+      id: user.id,
+      password: newPassword
+    };
+    
+    // Dispatcher l'action de mise à jour
+    dispatch(updateUser(updateData))
+      .unwrap()
+      .then(() => {
+        setSuccessMessage("Mot de passe mis à jour avec succès!");
+        setNewPassword("");
+        setConfirmPassword("");
+        setTimeout(() => setSuccessMessage(""), 3000);
+      })
+      .catch((err) => {
+        console.error("Erreur lors de la mise à jour du mot de passe:", err);
+      });
   };
 
   if (!user) {
@@ -51,9 +160,9 @@ const ViewProfileLayer = () => {
                 alt='WowDash React Vite'
                 className='border br-white border-width-2-px w-200-px h-200-px rounded-circle object-fit-cover'
               />
-              <h6 className='mb-0 mt-16'>{user.name} {user.prenom}</h6>
+              <h6 className='mb-0 mt-16'>{formData.name} {formData.prenom}</h6>
               <span className='text-secondary-light mb-16'>
-                {user.email}
+                {formData.email}
               </span>
             </div>
             <div className='mt-24'>
@@ -64,7 +173,7 @@ const ViewProfileLayer = () => {
                     Nom Complet
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.name} {user.prenom}
+                    : {formData.name} {formData.prenom}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -72,7 +181,7 @@ const ViewProfileLayer = () => {
                     Email
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.email}
+                    : {formData.email}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -80,7 +189,7 @@ const ViewProfileLayer = () => {
                     Téléphone
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.tel}
+                    : {formData.tel}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -88,7 +197,7 @@ const ViewProfileLayer = () => {
                     Département
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.departement?.nom || user.departement_id}
+                    : {user.departement?.nom || formData.departement_id}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -96,7 +205,7 @@ const ViewProfileLayer = () => {
                     Statut
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.statut}
+                    : {formData.statut}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -104,7 +213,7 @@ const ViewProfileLayer = () => {
                     Date de Naissance
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.date_naissance}
+                    : {formData.date_naissance}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -112,7 +221,7 @@ const ViewProfileLayer = () => {
                     RIB
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.rib}
+                    : {formData.rib}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -120,7 +229,7 @@ const ViewProfileLayer = () => {
                     CIN
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.cin}
+                    : {formData.cin}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -128,7 +237,7 @@ const ViewProfileLayer = () => {
                     Situation Familiale
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.situationFamiliale}
+                    : {formData.situationFamiliale}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -136,7 +245,7 @@ const ViewProfileLayer = () => {
                     Nombre d&apos;Enfants
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.nbEnfants}
+                    : {formData.nbEnfants}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -144,7 +253,7 @@ const ViewProfileLayer = () => {
                     Adresse
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.adresse}
+                    : {formData.adresse}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -152,7 +261,7 @@ const ViewProfileLayer = () => {
                     Type de Contrat
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.typeContrat}
+                    : {formData.typeContrat}
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1'>
@@ -160,7 +269,7 @@ const ViewProfileLayer = () => {
                     Rôle
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.role}
+                    : {formData.role}
                   </span>
                 </li>
               </ul>
@@ -172,6 +281,15 @@ const ViewProfileLayer = () => {
       <div className='col-lg-8'>
         <div className='card h-100'>
           <div className='card-body p-24'>
+            {successMessage && (
+              <div className="alert alert-success mb-3">{successMessage}</div>
+            )}
+            {error && (
+              <div className="alert alert-danger mb-3">
+                {typeof error === 'string' ? error : 'Une erreur est survenue lors de la modification du profil.'}
+              </div>
+            )}
+            
             <ul
               className='nav border-gradient-tab nav-pills mb-20 d-inline-flex'
               id='pills-tab'
@@ -252,7 +370,7 @@ const ViewProfileLayer = () => {
                   </div>
                 </div>
                 {/* Upload Image End */}
-                <form action='#'>
+                <form onSubmit={handleSubmit}>
                   <div className='row'>
                     <div className='col-sm-6'>
                       <div className='mb-20'>
@@ -268,7 +386,9 @@ const ViewProfileLayer = () => {
                           className='form-control radius-8'
                           id='name'
                           placeholder='Entrez le nom'
-                          defaultValue={user.name}
+                          value={formData.name}
+                          onChange={handleInputChange}
+                          required
                         />
                       </div>
                     </div>
@@ -286,7 +406,9 @@ const ViewProfileLayer = () => {
                           className='form-control radius-8'
                           id='prenom'
                           placeholder='Entrez le prénom'
-                          defaultValue={user.prenom}
+                          value={formData.prenom}
+                          onChange={handleInputChange}
+                          required
                         />
                       </div>
                     </div>
@@ -303,7 +425,9 @@ const ViewProfileLayer = () => {
                           className='form-control radius-8'
                           id='email'
                           placeholder="Entrez l\'adresse email"
-                          defaultValue={user.email}
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          required
                         />
                       </div>
                     </div>
@@ -320,7 +444,8 @@ const ViewProfileLayer = () => {
                           className='form-control radius-8'
                           id='tel'
                           placeholder='Entrez le numéro de téléphone'
-                          defaultValue={user.tel}
+                          value={formData.tel}
+                          onChange={handleInputChange}
                         />
                       </div>
                     </div>
@@ -333,18 +458,14 @@ const ViewProfileLayer = () => {
                           Département
                           <span className='text-danger-600'>*</span>{" "}
                         </label>
-                        <select
-                          className='form-control radius-8 form-select'
+                        <input
+                          type="text"
+                          className='form-control radius-8'
                           id='departement_id'
-                          defaultValue={user.departement_id || 'Sélectionner un département'}
-                        >
-                          <option value='Sélectionner un département' disabled>
-                            Sélectionner un département
-                          </option>
-                          <option value='IT'>IT</option>
-                          <option value='HR'>HR</option>
-                          <option value='Finance'>Finance</option>
-                        </select>
+                          value={formData.departement_id}
+                          readOnly
+                          required
+                        />
                       </div>
                     </div>
                     <div className='col-sm-6'>
@@ -356,19 +477,14 @@ const ViewProfileLayer = () => {
                           Statut
                           <span className='text-danger-600'>*</span>{" "}
                         </label>
-                        <select
-                          className='form-control radius-8 form-select'
+                        <input
+                          type="text"
+                          className='form-control radius-8'
                           id='statut'
-                          defaultValue={user.statut || 'Sélectionner un statut'}
-                        >
-                          <option value='Sélectionner un statut' disabled>
-                            Sélectionner un statut
-                          </option>
-                          <option value='Actif'>Actif</option>
-                          <option value='Inactif'>Inactif</option>
-                          <option value='Congé'>Congé</option>
-                          <option value='Malade'>Malade</option>
-                        </select>
+                          value={formData.statut}
+                          readOnly
+                          required
+                        />
                       </div>
                     </div>
                     <div className='col-sm-6'>
@@ -383,7 +499,8 @@ const ViewProfileLayer = () => {
                           type='date'
                           className='form-control radius-8'
                           id='date_naissance'
-                          defaultValue={user.date_naissance}
+                          value={formData.date_naissance}
+                          onChange={handleInputChange}
                         />
                       </div>
                     </div>
@@ -400,7 +517,8 @@ const ViewProfileLayer = () => {
                           className='form-control radius-8'
                           id='rib'
                           placeholder='Entrez le RIB'
-                          defaultValue={user.rib}
+                          value={formData.rib}
+                          onChange={handleInputChange}
                         />
                       </div>
                     </div>
@@ -417,7 +535,8 @@ const ViewProfileLayer = () => {
                           className='form-control radius-8'
                           id='cin'
                           placeholder='Entrez le CIN'
-                          defaultValue={user.cin}
+                          value={formData.cin}
+                          onChange={handleInputChange}
                         />
                       </div>
                     </div>
@@ -432,9 +551,10 @@ const ViewProfileLayer = () => {
                         <select
                           className='form-control radius-8 form-select'
                           id='situationFamiliale'
-                          defaultValue={user.situationFamiliale || 'Sélectionner une situation'}
+                          value={formData.situationFamiliale}
+                          onChange={handleInputChange}
                         >
-                          <option value='Sélectionner une situation' disabled>
+                          <option value='' disabled>
                             Sélectionner une situation
                           </option>
                           <option value='Célibataire'>Célibataire</option>
@@ -456,7 +576,8 @@ const ViewProfileLayer = () => {
                           className='form-control radius-8'
                           id='nbEnfants'
                           placeholder="Entrez le nombre d\'enfants"
-                          defaultValue={user.nbEnfants}
+                          value={formData.nbEnfants}
+                          onChange={handleInputChange}
                         />
                       </div>
                     </div>
@@ -472,7 +593,8 @@ const ViewProfileLayer = () => {
                           className='form-control radius-8'
                           id='adresse'
                           placeholder='Entrez l&apos;adresse'
-                          defaultValue={user.adresse}
+                          value={formData.adresse}
+                          onChange={handleInputChange}
                         />
                       </div>
                     </div>
@@ -484,17 +606,13 @@ const ViewProfileLayer = () => {
                         >
                           Type de Contrat
                         </label>
-                        <select
-                          className='form-control radius-8 form-select'
+                        <input
+                          type="text"
+                          className='form-control radius-8'
                           id='typeContrat'
-                          defaultValue={user.typeContrat || 'Sélectionner un type de contrat'}
-                        >
-                          <option value='Sélectionner un type de contrat' disabled>
-                            Sélectionner un type de contrat
-                          </option>
-                          <option value='Permanent'>Permanent</option>
-                          <option value='Temporaire'>Temporaire</option>
-                        </select>
+                          value={formData.typeContrat}
+                          readOnly
+                        />
                       </div>
                     </div>
                     <div className='col-sm-6'>
@@ -505,18 +623,13 @@ const ViewProfileLayer = () => {
                         >
                           Rôle
                         </label>
-                        <select
-                          className='form-control radius-8 form-select'
+                        <input
+                          type="text"
+                          className='form-control radius-8'
                           id='role'
-                          defaultValue={user.role || 'Sélectionner un rôle'}
-                        >
-                          <option value='Sélectionner un rôle' disabled>
-                            Sélectionner un rôle
-                          </option>
-                          <option value='Employe'>Employé</option>
-                          <option value='Chef_Dep'>Chef de Département</option>
-                          <option value='RH'>Ressources Humaines</option>
-                        </select>
+                          value={formData.role}
+                          readOnly
+                        />
                       </div>
                     </div>
                   </div>
@@ -524,14 +637,16 @@ const ViewProfileLayer = () => {
                     <button
                       type='button'
                       className='border border-danger-600 bg-hover-danger-200 text-danger-600 text-md px-56 py-11 radius-8'
+                      onClick={() => window.location.reload()}
                     >
                       Annuler
                     </button>
                     <button
-                      type='button'
+                      type='submit'
                       className='btn btn-primary border border-primary-600 text-md px-56 py-12 radius-8'
+                      disabled={status === 'loading'}
                     >
-                      Enregistrer
+                      {status === 'loading' ? 'Enregistrement...' : 'Enregistrer'}
                     </button>
                   </div>
                 </form>
@@ -543,67 +658,84 @@ const ViewProfileLayer = () => {
                 aria-labelledby='pills-change-passwork-tab'
                 tabIndex='0'
               >
-                <div className='mb-20'>
-                  <label
-                    htmlFor='your-password'
-                    className='form-label fw-semibold text-primary-light text-sm mb-8'
-                  >
-                    Nouveau Mot de Passe <span className='text-danger-600'>*</span>
-                  </label>
-                  <div className='position-relative'>
-                    <input
-                      type={passwordVisible ? "text" : "password"}
-                      className='form-control radius-8'
-                      id='your-password'
-                      placeholder='Entrez le nouveau mot de passe*'
-                    />
-                    <span
-                      className={`toggle-password ${
-                        passwordVisible ? "ri-eye-off-line" : "ri-eye-line"
-                      } cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 text-secondary-light`}
-                      onClick={togglePasswordVisibility}
-                    ></span>
+                {passwordError && (
+                  <div className="alert alert-danger mb-3">{passwordError}</div>
+                )}
+                <form onSubmit={handlePasswordChange}>
+                  <div className='mb-20'>
+                    <label
+                      htmlFor='your-password'
+                      className='form-label fw-semibold text-primary-light text-sm mb-8'
+                    >
+                      Nouveau Mot de Passe <span className='text-danger-600'>*</span>
+                    </label>
+                    <div className='position-relative'>
+                      <input
+                        type={passwordVisible ? "text" : "password"}
+                        className='form-control radius-8'
+                        id='your-password'
+                        placeholder='Entrez le nouveau mot de passe*'
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                      />
+                      <span
+                        className={`toggle-password ${
+                          passwordVisible ? "ri-eye-off-line" : "ri-eye-line"
+                        } cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 text-secondary-light`}
+                        onClick={togglePasswordVisibility}
+                      ></span>
+                    </div>
                   </div>
-                </div>
 
-                <div className='mb-20'>
-                  <label
-                    htmlFor='confirm-password'
-                    className='form-label fw-semibold text-primary-light text-sm mb-8'
-                  >
-                    Confirmer le Mot de Passe <span className='text-danger-600'>*</span>
-                  </label>
-                  <div className='position-relative'>
-                    <input
-                      type={confirmPasswordVisible ? "text" : "password"}
-                      className='form-control radius-8'
-                      id='confirm-password'
-                      placeholder='Confirmez le mot de passe*'
-                    />
-                    <span
-                      className={`toggle-password ${
-                        confirmPasswordVisible
-                          ? "ri-eye-off-line"
-                          : "ri-eye-line"
-                      } cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 text-secondary-light`}
-                      onClick={toggleConfirmPasswordVisibility}
-                    ></span>
+                  <div className='mb-20'>
+                    <label
+                      htmlFor='confirm-password'
+                      className='form-label fw-semibold text-primary-light text-sm mb-8'
+                    >
+                      Confirmer le Mot de Passe <span className='text-danger-600'>*</span>
+                    </label>
+                    <div className='position-relative'>
+                      <input
+                        type={confirmPasswordVisible ? "text" : "password"}
+                        className='form-control radius-8'
+                        id='confirm-password'
+                        placeholder='Confirmez le mot de passe*'
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                      />
+                      <span
+                        className={`toggle-password ${
+                          confirmPasswordVisible
+                            ? "ri-eye-off-line"
+                            : "ri-eye-line"
+                        } cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 text-secondary-light`}
+                        onClick={toggleConfirmPasswordVisibility}
+                      ></span>
+                    </div>
                   </div>
-                </div>
-                <div className='d-flex align-items-center justify-content-center gap-3 mt-24'>
-                  <button
-                    type='button'
-                    className='border border-danger-600 bg-hover-danger-200 text-danger-600 text-md px-56 py-11 radius-8'
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type='button'
-                    className='btn btn-primary border border-primary-600 text-md px-56 py-12 radius-8'
-                  >
-                    Mettre à jour le Mot de Passe
-                  </button>
-                </div>
+                  <div className='d-flex align-items-center justify-content-center gap-3 mt-24'>
+                    <button
+                      type='button'
+                      className='border border-danger-600 bg-hover-danger-200 text-danger-600 text-md px-56 py-11 radius-8'
+                      onClick={() => {
+                        setNewPassword("");
+                        setConfirmPassword("");
+                        setPasswordError("");
+                      }}
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type='submit'
+                      className='btn btn-primary border border-primary-600 text-md px-56 py-12 radius-8'
+                      disabled={status === 'loading'}
+                    >
+                      {status === 'loading' ? 'Mise à jour...' : 'Mettre à jour le Mot de Passe'}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
