@@ -19,16 +19,29 @@ const DepartmentsListPage = () => {
     dispatch(fetchDepartments());
   }, [dispatch]);
 
-  // Pagination calculations
+  // Ajouter la fonction de réinitialisation des filtres
+  const resetFilters = () => {
+    setSearchTerm('');
+    setCurrentPage(1);
+  };
+
+  // Ajouter la logique de filtrage
+  const filteredDepartments = departments.filter((department) => {
+    const matchesSearch = !searchTerm || 
+      department.nom.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  // Mise à jour des calculs de pagination pour utiliser les départements filtrés
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = departments.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(departments.length / itemsPerPage);
+  const currentItems = filteredDepartments.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredDepartments.length / itemsPerPage);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleItemsPerPageChange = (e) => {
-    const newItemsPerPage = e.target.value === 'all' ? departments.length : parseInt(e.target.value);
+    const newItemsPerPage = e.target.value === 'all' ? filteredDepartments.length : parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
@@ -215,16 +228,29 @@ const DepartmentsListPage = () => {
       <div className="card-body">
         {/* Filters */}
         <div className={`filters-container mb-4 ${filtersOpen ? 'd-block' : 'd-none'} d-md-block`}>
-          <div className="row g-3">
-            <div className="col-6 col-sm-4 col-md-3 col-lg-2">
+          <div className="row g-3 align-items-center">
+            <div className="col-6 col-sm-4 col-md-3 col-lg-3">
               <input
                 type="text"
                 className="form-control"
-                placeholder="Rechercher..."
+                placeholder="Rechercher un département..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
+
+            {searchTerm && (
+              <div className="col-auto">
+                <button
+                  className="btn btn-link text-danger"
+                  onClick={resetFilters}
+                  title="Réinitialiser les filtres"
+                  style={{ padding: '6px 10px' }}
+                >
+                  <Icon icon="mdi:close" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -237,12 +263,12 @@ const DepartmentsListPage = () => {
                   <input
                     type="checkbox"
                     className="form-check-input"
-                    checked={selectedDepartments.length === departments.length}
+                    checked={selectedDepartments.length === filteredDepartments.length}
                     onChange={() => {
-                      if (selectedDepartments.length === departments.length) {
+                      if (selectedDepartments.length === filteredDepartments.length) {
                         setSelectedDepartments([]);
                       } else {
-                        setSelectedDepartments(departments.map(d => d.id));
+                        setSelectedDepartments(filteredDepartments.map(d => d.id));
                       }
                     }}
                   />
@@ -334,4 +360,4 @@ const DepartmentsListPage = () => {
   );
 };
 
-export default DepartmentsListPage; 
+export default DepartmentsListPage;

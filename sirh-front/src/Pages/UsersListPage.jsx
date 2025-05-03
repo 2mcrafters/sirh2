@@ -26,16 +26,41 @@ const UsersListPage = () => {
     dispatch(fetchDepartments());
   }, [dispatch]);
 
-  // Pagination calculations
+  // Ajouter la fonction de réinitialisation des filtres
+  const resetFilters = () => {
+    setRole('');
+    setDepartment('');
+    setStatus('');
+    setSearchTerm('');
+    setCurrentPage(1);
+  };
+
+  // Ajout de la fonction de filtrage
+  const filteredUsers = users.filter((user) => {
+    const searchTermLower = searchTerm.toLowerCase();
+    const matchesSearch = 
+      user.name.toLowerCase().includes(searchTermLower) ||
+      user.prenom.toLowerCase().includes(searchTermLower) ||
+      user.cin?.toLowerCase().includes(searchTermLower) ||
+      user.email.toLowerCase().includes(searchTermLower);
+
+    const matchesRole = !role || user.role.toLowerCase() === role.toLowerCase();
+    const matchesDepartment = !department || user.departement_id === parseInt(department);
+    const matchesStatus = !status || user.statut.toLowerCase() === status.toLowerCase();
+
+    return matchesSearch && matchesRole && matchesDepartment && matchesStatus;
+  });
+
+  // Mise à jour des calculs de pagination pour utiliser les utilisateurs filtrés
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = users.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(users.length / itemsPerPage);
+  const currentItems = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleItemsPerPageChange = (e) => {
-    const newItemsPerPage = e.target.value === 'all' ? users.length : parseInt(e.target.value);
+    const newItemsPerPage = e.target.value === 'all' ? filteredUsers.length : parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
@@ -232,14 +257,13 @@ const UsersListPage = () => {
       <div className="card-body">
         {/* Filters */}
         <div className={`filters-container mb-4 ${filtersOpen ? 'd-block' : 'd-none'} d-md-block`}>
-          <div className="row g-3">
+          <div className="row g-3 align-items-center">
             <div className="col-6 col-sm-4 col-md-3 col-lg-2">
               <select className="form-select" value={role} onChange={e => setRole(e.target.value)}>
                 <option value="">Rôle</option>
-                <option value="admin">Administrateur</option>
-                <option value="manager">Manager</option>
-                <option value="employee">Employé</option>
-                <option value="intern">Stagiaire</option>
+                <option value="Employe">Employé</option>
+                <option value="Chef_Dep">Chef département</option>
+                <option value="RH">RH</option>
               </select>
             </div>
 
@@ -255,20 +279,35 @@ const UsersListPage = () => {
             <div className="col-6 col-sm-4 col-md-3 col-lg-2">
               <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
                 <option value="">Statut</option>
-                <option value="active">Actif</option>
-                <option value="inactive">Inactif</option>
+                <option value="Actif">Actif</option>
+                <option value="Inactif">Inactif</option>
+                <option value="Congé">Congé</option>
+                <option value="Malade">Malade</option>
               </select>
             </div>
 
-            <div className="col-6 col-sm-4 col-md-3 col-lg-2">
+            <div className="col-6 col-sm-4 col-md-3 col-lg-3">
               <input
                 type="text"
                 className="form-control"
-                placeholder="Rechercher..."
+                placeholder="Rechercher par nom ou CIN..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
+
+            {(role || department || status || searchTerm) && (
+              <div className="col-auto">
+                <button
+                  className="btn btn-link text-danger"
+                  onClick={resetFilters}
+                  title="Réinitialiser les filtres"
+                  style={{ padding: '6px 10px' }}
+                >
+                  <Icon icon="mdi:close" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -281,12 +320,12 @@ const UsersListPage = () => {
                   <input
                     type="checkbox"
                     className="form-check-input"
-                    checked={selectedUsers.length === users.length}
+                    checked={selectedUsers.length === filteredUsers.length}
                     onChange={() => {
-                      if (selectedUsers.length === users.length) {
+                      if (selectedUsers.length === filteredUsers.length) {
                         setSelectedUsers([]);
                       } else {
-                        setSelectedUsers(users.map(u => u.id));
+                        setSelectedUsers(filteredUsers.map(u => u.id));
                       }
                     }}
                   />

@@ -24,16 +24,40 @@ const AbsenceRequestsListPage = () => {
     dispatch(fetchUsers());
   }, [dispatch]);
 
-  // Pagination calculations
+  // Ajouter la fonction de réinitialisation des filtres
+  const resetFilters = () => {
+    setType('');
+    setStatus('');
+    setSearchTerm('');
+    setCurrentPage(1);
+  };
+
+  // Ajouter la logique de filtrage
+  const filteredRequests = absenceRequests.filter((request) => {
+    const user = users.find(u => u.id === request.user_id);
+    const userName = user ? `${user.name} ${user.prenom}`.toLowerCase() : '';
+    const searchLower = searchTerm.toLowerCase();
+    
+    const matchesSearch = userName.includes(searchLower) || 
+                         request.type.toLowerCase().includes(searchLower) ||
+                         request.motif?.toLowerCase().includes(searchLower);
+    
+    const matchesType = !type || request.type.toLowerCase() === type.toLowerCase();
+    const matchesStatus = !status || request.statut.toLowerCase() === status.toLowerCase();
+
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  // Mise à jour des calculs de pagination pour utiliser les demandes filtrées
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = absenceRequests.slice(indexOfLastItem - itemsPerPage, indexOfLastItem);
-  const totalPages = Math.ceil(absenceRequests.length / itemsPerPage);
+  const currentItems = filteredRequests.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleItemsPerPageChange = (e) => {
-    const newItemsPerPage = e.target.value === 'all' ? absenceRequests.length : parseInt(e.target.value);
+    const newItemsPerPage = e.target.value === 'all' ? filteredRequests.length : parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
@@ -220,7 +244,7 @@ const AbsenceRequestsListPage = () => {
       <div className="card-body">
         {/* Filters */}
         <div className={`filters-container mb-4 ${filtersOpen ? 'd-block' : 'd-none'} d-md-block`}>
-          <div className="row g-3">
+          <div className="row g-3 align-items-center">
             <div className="col-6 col-sm-4 col-md-3 col-lg-2">
               <select className="form-select" value={type} onChange={e => setType(e.target.value)}>
                 <option value="">Type</option>
@@ -239,7 +263,7 @@ const AbsenceRequestsListPage = () => {
               </select>
             </div>
 
-            <div className="col-6 col-sm-4 col-md-3 col-lg-2">
+            <div className="col-6 col-sm-4 col-md-3 col-lg-3">
               <input
                 type="text"
                 className="form-control"
@@ -248,6 +272,19 @@ const AbsenceRequestsListPage = () => {
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
+
+            {(type || status || searchTerm) && (
+              <div className="col-auto">
+                <button
+                  className="btn btn-link text-danger"
+                  onClick={resetFilters}
+                  title="Réinitialiser les filtres"
+                  style={{ padding: '6px 10px' }}
+                >
+                  <Icon icon="mdi:close" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -372,4 +409,4 @@ const AbsenceRequestsListPage = () => {
   );
 };
 
-export default AbsenceRequestsListPage; 
+export default AbsenceRequestsListPage;
