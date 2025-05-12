@@ -9,7 +9,6 @@ import Swal from 'sweetalert2';
 const UpdateDepartmentForm = ({ department, onSuccess }) => {
   const dispatch = useDispatch();
   const { status } = useSelector(state => state.departements);
-
   const validationSchema = Yup.object({
     nom: Yup.string()
       .required('Le nom du département est requis')

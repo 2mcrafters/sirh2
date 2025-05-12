@@ -17,8 +17,8 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             DepartementSeeder::class,
             EmployeSeeder::class,
-            AbsenceRequestSeeder::class,
-            PointageSeeder::class,
+            // AbsenceRequestSeeder::class,
+            // PointageSeeder::class,
         ]);
 
 }

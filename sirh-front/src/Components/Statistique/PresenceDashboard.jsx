@@ -6,7 +6,7 @@ import PresenceStatsCard from './PresenceStatsCard';
 import PresenceChart from './PresenceChart';
 import PresenceBarChart from './PresenceBarChart';
 
-const PresenceDashboard = () => {
+const PresenceDashboard =  ({ isDashboard = false }) => {
   const dispatch = useDispatch();
   const [periode, setPeriode] = useState('jour');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -123,8 +123,7 @@ const PresenceDashboard = () => {
                 iconColor="#F59E0B"
               />
             </div>
-
-            <div className="mt-10 d-flex flex-wrap justify-content-between gap-3">
+{ !isDashboard ?(           <div className="mt-10 d-flex flex-wrap justify-content-between gap-3">
   <div className="bg-white p-4 rounded-lg shadow flex-grow-1" style={{ flexBasis: '300px', maxWidth: '600px' }}>
     <h3 className="text-lg font-semibold mb-4">Répartition en pourcentage</h3>
     <PresenceChart data={chartData} />
@@ -133,7 +132,9 @@ const PresenceDashboard = () => {
     <h3 className="text-lg font-semibold mb-4">Nombre d'employés par statut</h3>
     <PresenceBarChart data={chartData} />
   </div>
-</div>
+</div>) : <></>
+
+} 
 
           </>
         ) : (

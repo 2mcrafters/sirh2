@@ -372,6 +372,29 @@ const PointagesListPage = () => {
 
   const handleSaveAll = async () => {
     try {
+      // Check if any user is missing a status
+      const usersWithoutStatus = Object.values(editablePointages)
+        .filter(pointage => !pointage.statutJour)
+        .map(pointage => {
+          const user = users.find(u => u.id === pointage.user_id);
+          return user ? `${user.name} ${user.prenom}` : 'Utilisateur inconnu';
+        });
+
+      if (usersWithoutStatus.length > 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Statut manquant',
+          html: `
+            <p>Veuillez sélectionner un statut pour les utilisateurs suivants :</p>
+            <ul>
+              ${usersWithoutStatus.map(user => `<li>${user}</li>`).join('')}
+            </ul>
+          `,
+          confirmButtonText: 'OK'
+        });
+        return;
+      }
+
       const updates = Object.values(editablePointages)
         .filter(pointage => {
           // Get the original pointage if it exists

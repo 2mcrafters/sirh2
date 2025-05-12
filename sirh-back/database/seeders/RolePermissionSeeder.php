@@ -12,11 +12,11 @@ class RolePermissionSeeder extends Seeder
     {
         
         $rolesPermissions = [
-            'EMPLOYE' => [
+            'Employe' => [
                 'demande absence',              
                 'view profile',          
             ],
-            'CHEF_DEP' => [
+            'Chef_Dep' => [
                 'view team absences',           
                 'validate absence',             
                 'create absence',               

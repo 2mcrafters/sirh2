@@ -1,5 +1,4 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
 import { API_ENDPOINTS } from '../../config/api';
 import api from '../../config/axios';
 
@@ -55,7 +54,7 @@ export const createUser = createAsyncThunk(
           });
           formData.append('picture', userData.picture);
           
-          const response = await axios.post(API_ENDPOINTS.USERS.BASE, formData, {
+          const response = await api.post(API_ENDPOINTS.USERS.BASE, formData, {
             headers: {
               'Content-Type': 'multipart/form-data'
             }
@@ -64,7 +63,7 @@ export const createUser = createAsyncThunk(
         }
       }
 
-      const response = await axios.post(API_ENDPOINTS.USERS.BASE, formattedData);
+      const response = await api.post(API_ENDPOINTS.USERS.BASE, formattedData);
       return response.data;
     } catch (error) {
       console.error('Error creating user:', error.response?.data);
@@ -106,7 +105,7 @@ export const deleteUsers = createAsyncThunk(
   'users/deleteUsers',
   async (ids, { rejectWithValue }) => {
     try {
-      await axios.delete(API_ENDPOINTS.USERS.BASE, { data: { ids } });
+      await api.delete(API_ENDPOINTS.USERS.BASE, { data: { ids } });
       return ids;
     } catch (error) {
       return rejectWithValue(error.response.data);

@@ -4,8 +4,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { fetchDepartments, deleteDepartments } from '../Redux/Slices/departementSlice';
 import { Icon } from '@iconify/react/dist/iconify.js';
 import Swal from 'sweetalert2';
+import api from '../config/axios';
 
 const DepartmentsListPage = () => {
+  const apiUrl = import.meta.env.VITE_API_URL;
+
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { items: departments, status: loading, error } = useSelector((state) => state.departments);
@@ -14,21 +17,72 @@ const DepartmentsListPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
+  const roles = useSelector((state) => state.auth.roles || []);
+  const isEmployee = roles.includes('Employe');  // Vérifie si le rôle est "EMPLOYE"
+  // useEffect(() => {
+  //   dispatch(fetchDepartments());
+  // }, [dispatch]);
 
-  useEffect(() => {
-    dispatch(fetchDepartments());
-  }, [dispatch]);
+  // Ajouter la fonction de réinitialisation des filtres
+  const resetFilters = () => {
+    setSearchTerm('');
+    setCurrentPage(1);
+  };
 
-  // Pagination calculations
+  const handleImportDepartments = async (e) => {
+    const file = e.target.files[0];
+  
+    if (!file) {
+      Swal.fire('Erreur!', 'Aucun fichier sélectionné.', 'error');
+      return;
+    }
+  
+    const formData = new FormData();
+    formData.append('file', file);
+  
+    try {
+      const response = await api.post(apiUrl + 'api/departements/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+  
+      // Si succès standard (200 OK)
+      if (response.status === 200) {
+        Swal.fire('Succès!', 'Les départements ont été importés avec succès.', 'success');
+        dispatch(fetchDepartments());
+      }
+    } catch (error) {
+      const status = error?.response?.status;
+  
+      // ✅ Cas ignorés (redirection, no content, CORS sans réponse explicite)
+      if (status === 204 || status === 302 || !error.response) {
+        Swal.fire('Import réussi', 'Les départements ont été importés (avec redirection ou réponse vide).', 'success');
+        dispatch(fetchDepartments());
+      } else {
+        console.error('Erreur lors de l’importation des départements:', error);
+        Swal.fire('Erreur!', error?.response?.data?.message || 'Une erreur est survenue.', 'error');
+      }
+    }
+  };
+  
+  // Ajouter la logique de filtrage
+  const filteredDepartments = departments.filter((department) => {
+    const matchesSearch = !searchTerm || 
+      department.nom.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  // Mise à jour des calculs de pagination pour utiliser les départements filtrés
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = departments.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(departments.length / itemsPerPage);
+  const currentItems = filteredDepartments.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredDepartments.length / itemsPerPage);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleItemsPerPageChange = (e) => {
-    const newItemsPerPage = e.target.value === 'all' ? departments.length : parseInt(e.target.value);
+    const newItemsPerPage = e.target.value === 'all' ? filteredDepartments.length : parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
@@ -179,7 +233,7 @@ const DepartmentsListPage = () => {
         <h5 className="card-title mb-0">Départements</h5>
 
         <div className="d-flex flex-wrap gap-2">
-          <Link to="/creer-departement" className="btn btn-primary d-flex align-items-center">
+          <Link to="/departments/add" className="btn btn-primary d-flex align-items-center">
             <Icon icon="mdi:plus" />
             <span className="d-none d-md-inline ms-1">Ajouter</span>
           </Link>
@@ -193,15 +247,32 @@ const DepartmentsListPage = () => {
             <span className="d-none d-md-inline ms-1">Supprimer</span>
           </button>
 
-          <button className="btn btn-outline-secondary d-flex align-items-center">
-            <Icon icon="mdi:download" />
-            <span className="d-none d-md-inline ms-1">Export</span>
-          </button>
+          <button 
+  className="btn btn-outline-secondary d-flex align-items-center"
+  onClick={() => window.open(`${import.meta.env.VITE_API_URL}api/export-departements`, '_blank')}
+>
+  <Icon icon="mdi:download" />
+  <span className="d-none d-md-inline ms-1">Export</span>
+</button>
 
-          <button className="btn btn-outline-secondary d-flex align-items-center">
+
+{!isEmployee && (
+          <button
+            className="btn btn-outline-secondary d-flex align-items-center"
+            onClick={() => document.getElementById('fileInput').click()}  
+          >
             <Icon icon="mdi:upload" />
             <span className="d-none d-md-inline ms-1">Import</span>
           </button>
+        )}
+          <input
+            type="file"
+            id="fileInput"
+            style={{ display: 'none' }}
+            accept=".xlsx, .xls, .csv"  
+            onChange={handleImportDepartments}  
+          />
+        
 
           <button
             className="btn btn-outline-secondary d-inline d-md-none"
@@ -215,16 +286,29 @@ const DepartmentsListPage = () => {
       <div className="card-body">
         {/* Filters */}
         <div className={`filters-container mb-4 ${filtersOpen ? 'd-block' : 'd-none'} d-md-block`}>
-          <div className="row g-3">
-            <div className="col-6 col-sm-4 col-md-3 col-lg-2">
+          <div className="row g-3 align-items-center">
+            <div className="col-6 col-sm-4 col-md-3 col-lg-3">
               <input
                 type="text"
                 className="form-control"
-                placeholder="Rechercher..."
+                placeholder="Rechercher un département..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
+
+            {searchTerm && (
+              <div className="col-auto">
+                <button
+                  className="btn btn-link text-danger"
+                  onClick={resetFilters}
+                  title="Réinitialiser les filtres"
+                  style={{ padding: '6px 10px' }}
+                >
+                  <Icon icon="mdi:close" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -237,12 +321,12 @@ const DepartmentsListPage = () => {
                   <input
                     type="checkbox"
                     className="form-check-input"
-                    checked={selectedDepartments.length === departments.length}
+                    checked={selectedDepartments.length === filteredDepartments.length}
                     onChange={() => {
-                      if (selectedDepartments.length === departments.length) {
+                      if (selectedDepartments.length === filteredDepartments.length) {
                         setSelectedDepartments([]);
                       } else {
-                        setSelectedDepartments(departments.map(d => d.id));
+                        setSelectedDepartments(filteredDepartments.map(d => d.id));
                       }
                     }}
                   />
@@ -334,4 +418,4 @@ const DepartmentsListPage = () => {
   );
 };
 
-export default DepartmentsListPage; 
+export default DepartmentsListPage;

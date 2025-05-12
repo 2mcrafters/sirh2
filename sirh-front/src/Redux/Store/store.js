@@ -15,7 +15,5 @@ export const store = configureStore({
     departments: departmentReducer,
     absenceRequests: absenceRequestReducer,
     pointages: pointageReducer,
-
-   
   }
 });

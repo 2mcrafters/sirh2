@@ -37,7 +37,7 @@ const EditDepartmentPage = () => {
             <div className="alert alert-danger" role="alert">
               Département non trouvé
             </div>
-            <button className="btn btn-secondary" onClick={() => navigate('/liste-departements')}>
+            <button className="btn btn-secondary" onClick={() => navigate('/departments')}>
               Retour à la liste
             </button>
           </div>

@@ -62,6 +62,7 @@ export const deleteDepartments = createAsyncThunk(
   }
 );
 
+
 const departmentSlice = createSlice({
   name: 'departments',
   initialState: {
@@ -123,6 +124,8 @@ const departmentSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       });
+   
+      
   }
 });
 

@@ -14,7 +14,7 @@ class PointageSeeder extends Seeder
      */
     public function run(): void
     {
-        $employeIds = range(3, 11); 
+        $employeIds = range(146, 154); 
         $jours = 10; 
 
         foreach ($employeIds as $employeId) {

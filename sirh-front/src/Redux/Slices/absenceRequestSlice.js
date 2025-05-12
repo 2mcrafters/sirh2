@@ -21,25 +21,69 @@ export const fetchAbsenceRequests = createAsyncThunk(
 
 export const createAbsenceRequest = createAsyncThunk(
   'absenceRequests/createAbsenceRequest',
-  async (requestData, { rejectWithValue }) => {
+  async (formData, { rejectWithValue }) => {
     try {
-      const response = await api.post(API_ENDPOINTS.ABSENCE_REQUESTS.BASE, requestData);
+      // Log the FormData contents
+      console.log('Create FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          console.log(`${key}: File(${value.name}, ${value.type}, ${value.size} bytes)`);
+        } else {
+          console.log(`${key}: ${value}`);
+        }
+      }
+
+      const response = await api.post(API_ENDPOINTS.ABSENCE_REQUESTS.BASE, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      console.error('Error creating absence request:', error.response?.data);
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
 export const updateAbsenceRequest = createAsyncThunk(
-  'absenceRequests/update',
+  'absenceRequest/updateAbsenceRequest',
   async ({ id, data }, { rejectWithValue }) => {
     try {
-      const response = await api.post(`${API_ENDPOINTS.ABSENCE_REQUESTS.BASE}/update/${id}`, data, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      console.log('Updating absence request with data:', data);
+      
+      // Create FormData and append _method=PUT
+      const formData = new FormData();
+      formData.append('_method', 'PUT');
+      
+      // Append all other fields
+      Object.keys(data).forEach(key => {
+        formData.append(key, data[key]);
       });
+
+      // Log the FormData contents
+      console.log('FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}: ${value}`);
+      }
+
+      const response = await api.post(
+        `/absences/update/${id}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      console.error('Error updating absence request:', error);
+      if (error.response) {
+        console.error('Error response:', error.response.data);
+        return rejectWithValue(error.response.data);
+      }
+      return rejectWithValue(error.message);
     }
   }
 );

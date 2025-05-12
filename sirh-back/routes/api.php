@@ -16,6 +16,7 @@ use App\Http\Middleware\RoleMiddleware;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/employes', [UserController::class, 'store']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -26,12 +27,11 @@ Route::post('/departements', [DepartementController::class, 'store']);
 Route::put('/departements', [DepartementController::class, 'update']);
 Route::delete('/departements', [DepartementController::class, 'destroy']);
 Route::get('/employes', [UserController::class, 'index']);
-Route::post('/employes', [UserController::class, 'store']);
 Route::put('/employes/update/{id}', [UserController::class, 'update']);
 Route::delete('/employes', [UserController::class, 'destroy']); 
 Route::get('/absences', [AbsenceRequestController::class, 'index']);
 Route::post('/absences', [AbsenceRequestController::class, 'store']);
-Route::put('/absences/update/{id}', [AbsenceRequestController::class, 'update']);
+Route::match(['post', 'put'], '/absences/update/{id}', [AbsenceRequestController::class, 'update']);
 Route::delete('/absences', [AbsenceRequestController::class, 'destroy']);
 Route::get('/pointages', [PointageController::class, 'index']);
 Route::post('/pointages', [PointageController::class, 'store']);

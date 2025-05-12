@@ -8,13 +8,23 @@ const ViewProfileLayer = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const { status, error } = useSelector((state) => state.users);
-  
+  const { items: departments } = useSelector((state) => state.departments);
+  const getDepartmentName = (id) => {
+    const dept = departments.find((d) => d.id === id);
+    return dept ? dept.nom : "Département inconnu";
+  };
   // État local pour le formulaire
   const [formData, setFormData] = useState({});
   const [imagePreview, setImagePreview] = useState(
-    user?.picture
-      ? `${apiUrl}storage/profile_picture/${user.picture}`
-      : "assets/images/user-grid/user-grid-img13.png"
+    useEffect(() => {
+      if (user?.picture) {
+        setImagePreview(`${apiUrl}storage/profile_picture/${user.picture}`);
+      } else {
+        setImagePreview("assets/images/user-grid/user-grid-img13.png");
+      }
+      console.log(imagePreview);
+    }, [user])
+    
   );
   
  
@@ -203,7 +213,8 @@ const ViewProfileLayer = () => {
                     Département
                   </span>
                   <span className='w-70 text-secondary-light fw-medium'>
-                    : {user.departement?.nom || formData.departement_id}
+                  : {getDepartmentName(formData.departement_id)}
+
                   </span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
@@ -367,7 +378,8 @@ const ViewProfileLayer = () => {
                       <div
                         id='imagePreview'
                         style={{
-                          backgroundImage: `url(${imagePreview})`,
+                          // backgroundImage: `url(${imagePreview})`,
+                          backgroundImage: imagePreview ? `url(${imagePreview})` : "none",
                           backgroundSize: "cover",
                           backgroundPosition: "center",
                         }}
@@ -468,7 +480,7 @@ const ViewProfileLayer = () => {
                           type="text"
                           className='form-control radius-8'
                           id='departement_id'
-                          value={formData.departement_id}
+                          value={getDepartmentName(formData.departement_id)}
                           readOnly
                           required
                         />

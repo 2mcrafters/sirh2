@@ -15,7 +15,7 @@ const PresenceStatsCard = ({ label, value, percentage, icon, bgColor, iconColor 
       </div>
       <p className="fw-medium text-sm text-primary-light mt-12 mb-0">
         <span className="text-success-main">+{percentage}%</span>
-        Dernière période
+        
       </p>
     </div>
   </div>

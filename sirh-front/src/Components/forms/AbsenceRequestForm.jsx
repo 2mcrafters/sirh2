@@ -9,6 +9,13 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
   const dispatch = useDispatch();
   const { status } = useSelector(state => state.absenceRequests);
   const { user, isLoading: authLoading } = useSelector(state => state.auth);
+  const role = useSelector(state => state.auth.roles);
+  // Debug initialValues
+  useEffect(() => {
+    console.log('Initial values:', initialValues);
+    console.log('Is edit mode:', isEdit);
+    console.log('Current user:', user);
+  }, [initialValues, isEdit, user]);
 
   useEffect(() => {
     if (!isEdit && !user) {
@@ -39,56 +46,108 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
 
   const handleSubmit = async (values, { setSubmitting, resetForm }) => {
     try {
-      const formData = new FormData();
-
       if (isEdit) {
         // For update
-        formData.append('id', initialValues.id);
-        formData.append('user_id', values.user_id);
-        formData.append('type', values.type);
-        formData.append('dateDebut', values.dateDebut);
-        formData.append('dateFin', values.dateFin);
-        formData.append('motif', values.motif || '');
+        const userId = initialValues?.user_id;
+        if (!userId) {
+          throw new Error('Impossible de déterminer l\'utilisateur pour la mise à jour');
+        }
+        
+        // Create FormData
+        const formData = new FormData();
+        
+        // Add required fields with fallback to initialValues
+        formData.append('user_id', String(userId));
+        formData.append('type', values.type || initialValues.type);
+        formData.append('dateDebut', new Date(values.dateDebut || initialValues.dateDebut).toISOString().split('T')[0]);
+        formData.append('dateFin', new Date(values.dateFin || initialValues.dateFin).toISOString().split('T')[0]);
         formData.append('statut', values.statut || initialValues.statut || 'en_attente');
         
-        if (values.justification instanceof File) {
-          formData.append('justification', values.justification);
-        } else if (values.justification) {
-          formData.append('justification', '');
+        // Add optional fields if they exist
+        if (values.motif || initialValues.motif) {
+          formData.append('motif', values.motif || initialValues.motif);
         }
+
+        // Handle justification file
+        if (values.justification instanceof File) {
+          console.log('Adding file to FormData:', values.justification);
+          formData.append('justification', values.justification);
+        } else if (values.justification === null || values.justification === '') {
+          formData.append('justification', '');
+        } else if (values.justification) {
+          formData.append('justification', values.justification);
+        }
+
+        // Log FormData contents
+        console.log('FormData contents for update:');
+        for (let [key, value] of formData.entries()) {
+          if (value instanceof File) {
+            console.log(`${key}: File(${value.name}, ${value.type}, ${value.size} bytes)`);
+          } else {
+            console.log(`${key}: ${value}`);
+          }
+        }
+
+        // Convert FormData to plain object
+        const requestData = {};
+        for (let [key, value] of formData.entries()) {
+          requestData[key] = value;
+        }
+
+        console.log('Sending request data:', requestData);
+
+        const response = await dispatch(
+          updateAbsenceRequest({ id: initialValues.id, data: requestData })
+        ).unwrap();
+
+        if (response && response.error) {
+          throw new Error(response.error);
+        }
+
+        resetForm();
+        if (onSuccess) onSuccess();
       } else {
         // For create
         if (!user) {
           throw new Error('Utilisateur non authentifié');
         }
-        formData.append('user_id', user.id);
+
+        const formData = new FormData();
+        
+        // Add required fields
+        formData.append('user_id', String(user.id));
         formData.append('type', values.type);
-        formData.append('dateDebut', values.dateDebut);
-        formData.append('dateFin', values.dateFin);
-        formData.append('motif', values.motif || '');
+        formData.append('dateDebut', new Date(values.dateDebut).toISOString().split('T')[0]);
+        formData.append('dateFin', new Date(values.dateFin).toISOString().split('T')[0]);
         formData.append('statut', 'en_attente');
         
+        // Add optional fields if they exist
+        if (values.motif) {
+          formData.append('motif', values.motif);
+        }
+
         if (values.justification instanceof File) {
+          console.log('Adding file to FormData:', values.justification);
           formData.append('justification', values.justification);
         }
+
+        const response = await dispatch(createAbsenceRequest(formData)).unwrap();
+
+        if (response && response.error) {
+          throw new Error(response.error);
+        }
+
+        resetForm();
+        if (onSuccess) onSuccess();
       }
-
-      const response = await dispatch(
-        isEdit ? updateAbsenceRequest(formData) : createAbsenceRequest(formData)
-      ).unwrap();
-
-      if (response && response.error) {
-        throw new Error(response.error);
-      }
-
-      resetForm();
-      if (onSuccess) onSuccess();
     } catch (error) {
       console.error('Error submitting form:', error);
       let errorMessage = 'Une erreur est survenue lors de la mise à jour de la demande d\'absence.';
       
-      if (error.error && error.error.justification) {
-        errorMessage = error.error.justification.join(' ');
+      if (error.error) {
+        errorMessage = Object.entries(error.error)
+          .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+          .join('\n');
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -206,16 +265,17 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
                       onChange={(event) => {
                         const file = event.currentTarget.files[0];
                         if (file) {
+                          console.log('Selected file:', file);
                           setFieldValue("justification", file);
                         } else {
                           setFieldValue("justification", null);
                         }
                       }}
                     />
-                    {values.justification && (
+                    {initialValues.justification && !values.justification && (
                       <div className="mt-2">
                         <small className="text-muted">
-                          Fichier sélectionné: {values.justification.name || values.justification}
+                          Fichier actuel: {initialValues.justification}
                         </small>
                       </div>
                     )}
@@ -224,7 +284,7 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
                 </div>
               </div>
 
-              {isEdit && (
+              {(isEdit && (role.includes("RH") || role.includes("Chef_Dep"))) && (
                 <div className="mb-3">
                   <label htmlFor="statut" className="form-label">Statut</label>
                   <Field

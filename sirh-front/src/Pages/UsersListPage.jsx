@@ -5,12 +5,14 @@ import { fetchUsers, deleteUsers } from '../Redux/Slices/userSlice';
 import { fetchDepartments } from '../Redux/Slices/departementSlice';
 import { Icon } from '@iconify/react/dist/iconify.js';
 import Swal from 'sweetalert2';
+import api from '../config/axios';
 
 const UsersListPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { items: users, status: loading, error } = useSelector((state) => state.users);
   const { items: departments } = useSelector((state) => state.departments);
+  const { user: currentUser } = useSelector((state) => state.auth); // Ajout de l'utilisateur connecté
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -19,22 +21,48 @@ const UsersListPage = () => {
   const [department, setDepartment] = useState('');
   const [status, setStatus] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const roles = useSelector((state) => state.auth.roles || []);
+  const isEmployee = roles.includes('Employe');  // Vérifie si le rôle est "EMPLOYE"
+  // useEffect(() => {
+  //   dispatch(fetchUsers());
+  //   dispatch(fetchDepartments());
+  // }, [dispatch]);
 
-  useEffect(() => {
-    dispatch(fetchUsers());
-    dispatch(fetchDepartments());
-  }, [dispatch]);
+  // Ajouter la fonction de réinitialisation des filtres
+  const resetFilters = () => {
+    setRole('');
+    setDepartment('');
+    setStatus('');
+    setSearchTerm('');
+    setCurrentPage(1);
+  };
 
-  // Pagination calculations
+  // Ajout de la fonction de filtrage
+  const filteredUsers = users.filter((user) => {
+    const searchTermLower = searchTerm.toLowerCase();
+    const matchesSearch = 
+      user.name.toLowerCase().includes(searchTermLower) ||
+      user.prenom.toLowerCase().includes(searchTermLower) ||
+      user.cin?.toLowerCase().includes(searchTermLower) ||
+      user.email.toLowerCase().includes(searchTermLower);
+
+    const matchesRole = !role || user.role.toLowerCase() === role.toLowerCase();
+    const matchesDepartment = !department || user.departement_id === parseInt(department);
+    const matchesStatus = !status || user.statut.toLowerCase() === status.toLowerCase();
+
+    return matchesSearch && matchesRole && matchesDepartment && matchesStatus;
+  });
+
+  // Mise à jour des calculs de pagination pour utiliser les utilisateurs filtrés
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = users.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(users.length / itemsPerPage);
+  const currentItems = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleItemsPerPageChange = (e) => {
-    const newItemsPerPage = e.target.value === 'all' ? users.length : parseInt(e.target.value);
+    const newItemsPerPage = e.target.value === 'all' ? filteredUsers.length : parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
@@ -67,6 +95,16 @@ const UsersListPage = () => {
   };
 
   const handleEdit = (id) => {
+    // Empêcher la modification si c'est l'utilisateur connecté
+    if (currentUser && currentUser.id === id) {
+      Swal.fire({
+        title: 'Action non autorisée',
+        text: 'Vous ne pouvez pas modifier votre profil depuis cette page. Veuillez utiliser la page de profil.',
+        icon: 'warning',
+        confirmButtonText: 'OK'
+      });
+      return;
+    }
     navigate(`/users/${id}/edit`);
   };
 
@@ -177,7 +215,45 @@ const UsersListPage = () => {
       </div>
     );
   }
+  
 
+  const handleImport = async (e) => {
+    const file = e.target.files[0]; 
+  
+    if (!file) {
+      Swal.fire('Erreur', 'Veuillez sélectionner un fichier', 'error');
+      return;
+    }
+  
+    const formData = new FormData();
+    formData.append('file', file);
+  
+    try {
+      const response = await api.post('/import-employes', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+  
+      // Cas normal : succès HTTP 200
+      if (response.status === 200) {
+        Swal.fire('Succès', 'Fichier importé avec succès', 'success');
+        await dispatch(fetchUsers());
+      }
+    } catch (error) {
+      const status = error?.response?.status;
+  
+      // ✅ Si le backend retourne 204 No Content ou 302 Redirect, on considère que l'import est OK
+      if (status === 204 || status === 302 || !error.response) {
+        Swal.fire('Import réussi', 'Employés importés (avec redirection ou sans réponse explicite).', 'success');
+        await dispatch(fetchUsers());
+      } else {
+        console.error('Erreur lors de l’importation des employés:', error);
+        Swal.fire('Erreur', error?.response?.data?.message || 'Une erreur est survenue lors de l’importation.', 'error');
+      }
+    }
+  };
+  
   return (
     <div className="card basic-data-table">
       {/* Header */}
@@ -199,15 +275,32 @@ const UsersListPage = () => {
             <span className="d-none d-md-inline ms-1">Supprimer</span>
           </button>
 
-          <button className="btn btn-outline-secondary d-flex align-items-center">
-            <Icon icon="mdi:download" />
-            <span className="d-none d-md-inline ms-1">Export</span>
-          </button>
+          <button 
+  className="btn btn-outline-secondary d-flex align-items-center"
+  onClick={() => window.open(`${import.meta.env.VITE_API_URL}api/export-employes`, '_blank')}
+>
+  <Icon icon="mdi:download" />
+  <span className="d-none d-md-inline ms-1">Export</span>
+</button>
 
-          <button className="btn btn-outline-secondary d-flex align-items-center">
-            <Icon icon="mdi:upload" />
-            <span className="d-none d-md-inline ms-1">Import</span>
+          
+{!isEmployee && (     
+          <button
+            className="btn btn-outline-secondary d-flex align-items-center"
+            onClick={() => document.getElementById('fileInput').click()}
+          >
+          <Icon icon="mdi:upload" />
+          <span className="d-none d-md-inline ms-1">Import</span>
+          <input
+            type="file"
+            id="fileInput"
+            style={{ display: 'none' }}
+            onChange={handleImport}
+            accept=".csv, .xlsx"
+          />
           </button>
+)}
+        
 
           <button
             className="btn btn-outline-secondary d-inline d-md-none"
@@ -221,14 +314,13 @@ const UsersListPage = () => {
       <div className="card-body">
         {/* Filters */}
         <div className={`filters-container mb-4 ${filtersOpen ? 'd-block' : 'd-none'} d-md-block`}>
-          <div className="row g-3">
+          <div className="row g-3 align-items-center">
             <div className="col-6 col-sm-4 col-md-3 col-lg-2">
               <select className="form-select" value={role} onChange={e => setRole(e.target.value)}>
                 <option value="">Rôle</option>
-                <option value="admin">Administrateur</option>
-                <option value="manager">Manager</option>
-                <option value="employee">Employé</option>
-                <option value="intern">Stagiaire</option>
+                <option value="Employe">Employé</option>
+                <option value="Chef_Dep">Chef département</option>
+                <option value="RH">RH</option>
               </select>
             </div>
 
@@ -244,20 +336,35 @@ const UsersListPage = () => {
             <div className="col-6 col-sm-4 col-md-3 col-lg-2">
               <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
                 <option value="">Statut</option>
-                <option value="active">Actif</option>
-                <option value="inactive">Inactif</option>
+                <option value="Actif">Actif</option>
+                <option value="Inactif">Inactif</option>
+                <option value="Congé">Congé</option>
+                <option value="Malade">Malade</option>
               </select>
             </div>
 
-            <div className="col-6 col-sm-4 col-md-3 col-lg-2">
+            <div className="col-6 col-sm-4 col-md-3 col-lg-3">
               <input
                 type="text"
                 className="form-control"
-                placeholder="Rechercher..."
+                placeholder="Rechercher par nom ou CIN..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
+
+            {(role || department || status || searchTerm) && (
+              <div className="col-auto">
+                <button
+                  className="btn btn-link text-danger"
+                  onClick={resetFilters}
+                  title="Réinitialiser les filtres"
+                  style={{ padding: '6px 10px' }}
+                >
+                  <Icon icon="mdi:close" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -270,12 +377,12 @@ const UsersListPage = () => {
                   <input
                     type="checkbox"
                     className="form-check-input"
-                    checked={selectedUsers.length === users.length}
+                    checked={selectedUsers.length === filteredUsers.length}
                     onChange={() => {
-                      if (selectedUsers.length === users.length) {
+                      if (selectedUsers.length === filteredUsers.length) {
                         setSelectedUsers([]);
                       } else {
-                        setSelectedUsers(users.map(u => u.id));
+                        setSelectedUsers(filteredUsers.map(u => u.id));
                       }
                     }}
                   />
@@ -292,6 +399,7 @@ const UsersListPage = () => {
             <tbody>
               {currentItems.map((user) => {
                 const department = departments.find(d => d.id === user.departement_id);
+                const isCurrentUser = currentUser && currentUser.id === user.id;
                 return (
                   <tr key={user.id}>
                     <td>
@@ -311,9 +419,10 @@ const UsersListPage = () => {
                     <td className="text-end">
                       <div className="d-flex justify-content-end gap-2">
                         <button
-                          className="btn btn-sm btn-primary me-2"
+                          className={`btn btn-sm ${isCurrentUser ? 'btn-secondary' : 'btn-primary'} me-2`}
                           onClick={() => handleEdit(user.id)}
-                          title="Modifier"
+                          title={isCurrentUser ? "Utilisez la page de profil pour modifier vos informations" : "Modifier"}
+                          disabled={isCurrentUser}
                         >
                           <Icon icon="mdi:pencil" />
                         </button>
@@ -380,4 +489,4 @@ const UsersListPage = () => {
   );
 };
 
-export default UsersListPage; 
+export default UsersListPage;

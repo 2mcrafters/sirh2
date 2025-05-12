@@ -16,6 +16,8 @@ import EditAbsenceRequestPage from './Pages/EditAbsenceRequestPage'
 import PointagesListPage from './Pages/PointagesListPage'
 import AddPointagePage from './Pages/AddPointagePage'
 import EditPointagePage from './Pages/EditPointagePage'
+import PrivateRoute from './PrivateRoute'
+import NotFound from './Pages/NotFound'
 import "./degrade.css"
 
 
@@ -40,10 +42,12 @@ function App() {
       dispatch(fetchDepartments());
       dispatch(fetchAbsenceRequests());
       dispatch(fetchPointages());
-      // dispatch(fetchPresenceStats());
-      
+  
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      dispatch(fetchPresenceStats({ periode: 'mois', mois: currentMonth }));
     }
   }, [auth.isSuccess, auth.token, dispatch]);
+  
 
 
 
@@ -54,7 +58,9 @@ function App() {
         <Route path="/login" element={<Login />} />
 
         {/* Protected routes with MasterLayout */}
-        <Route element={<MasterLayout />}>
+        <Route element={  <PrivateRoute>
+                            <MasterLayout />
+                          </PrivateRoute>}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/view-profile" element={<ViewProfileLayer />} />
           <Route path='/dashboard' element={<Dashboard/>} />
@@ -81,6 +87,10 @@ function App() {
           <Route path="/pointages" element={<PointagesListPage />} />
           <Route path="/pointages/add" element={<AddPointagePage />} />
           <Route path="/pointages/:id/edit" element={<EditPointagePage />} />
+
+          {/* Page introuvable */}
+          <Route path="*" element={<NotFound />} />
+
         </Route>
       </Routes>
     </AuthProvider>
