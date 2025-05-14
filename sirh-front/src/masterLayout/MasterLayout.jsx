@@ -159,7 +159,7 @@ const apiUrl = import.meta.env.VITE_API_URL;
               </li>
 
   {/* Gestion des employés - RH & Chef_Dep */}
-  {(roles.includes("RH") || roles.includes("Chef_Dep")) && (
+  {(roles.includes("RH") || roles.includes("Chef_Dep") || roles.includes("Chef_Projet")) && (
     <li className="dropdown">
       <Link to="#">
         <Icon icon="mdi:account-group-outline" className="menu-icon" />
@@ -170,6 +170,13 @@ const apiUrl = import.meta.env.VITE_API_URL;
           <NavLink to="/users" className={(navData) => navData.isActive ? "active-page" : ""}>
             <Icon icon="mdi:format-list-bulleted" className="circle-icon w-auto" />
             Liste des employés
+                    </NavLink>
+                  </li>
+
+                  <li>
+          <NavLink to="/users/temp" className={(navData) => navData.isActive ? "active-page" : ""}>
+            <Icon icon="mdi:format-list-bulleted" className="circle-icon w-auto" />
+            Les employés Temporaire
                     </NavLink>
                   </li>
         <li>
@@ -185,6 +192,7 @@ const apiUrl = import.meta.env.VITE_API_URL;
 
   {/* Gestion des départements - RH uniquement */}
   {roles.includes("RH") && (
+    <>
     <li className="dropdown">
       <Link to="#" >
         <Icon icon="fluent:building-people-24-regular" className="menu-icon" />
@@ -205,6 +213,26 @@ const apiUrl = import.meta.env.VITE_API_URL;
                  
                 </ul>
               </li>
+               <li className="dropdown">
+               <Link to="#" >
+                 <Icon icon="fluent:building-people-24-regular" className="menu-icon" />
+                 <span>Societes</span>
+               </Link>
+               <ul className="sidebar-submenu"> <li>
+                   <NavLink to="/societes" className={(navData) => navData.isActive ? "active-page" : ""}>
+                     <Icon icon="mdi:format-list-bulleted-type" className="circle-icon w-auto" />
+                     Liste des Societess
+                             </NavLink>
+                           </li>
+                 <li>
+                   <NavLink to="/departments/add" className={(navData) => navData.isActive ? "active-page" : ""}>
+                     <Icon icon="mdi:plus-box-outline" className="circle-icon w-auto" />
+                     Créer un département
+                             </NavLink>
+                           </li>
+                          
+                         </ul>
+                       </li></>
   )}
 
   {/* Demande d'absences - Tous */}
@@ -214,7 +242,7 @@ const apiUrl = import.meta.env.VITE_API_URL;
       <span>Demande d'absences</span>
               </Link>
     <ul className="sidebar-submenu">
-      {(roles.includes("RH") || roles.includes("Chef_Dep")) && (
+      {(roles.includes("RH") || roles.includes("Chef_Dep") || roles.includes("Chef_Projet")) && (
         <li>
           <NavLink to="/absences" className={(navData) => navData.isActive ? "active-page" : ""}>
             <Icon icon="mdi:clipboard-list-outline" className="circle-icon w-auto" />

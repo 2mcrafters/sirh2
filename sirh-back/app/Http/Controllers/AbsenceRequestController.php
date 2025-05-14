@@ -16,32 +16,41 @@ class AbsenceRequestController extends Controller
 
      public function index()
      {
-         $user = auth()->user();
-     
-         if ($user->hasRole('Employe')) {
-             // Employé : uniquement ses demandes
+         $authUser = auth()->user();
+         $societeId = $authUser->societe_id;
+ 
+         if ($authUser->hasRole('Employe')) {
+             // Employé : uniquement ses demandes d'absence
              $absences = AbsenceRequest::with(['user.departement'])
-                 ->where('user_id', $user->id)
+                 ->where('user_id', $authUser->id)
                  ->get();
-     
-         } elseif ($user->hasRole('Chef_Dep')) {
-             // Chef_Dep : demandes des employés de son département
+ 
+         } elseif ($authUser->hasAnyRole(['Chef_Dep', 'Chef_Projet'])) {
+             // Chef_Dep ou Chef_Projet : demandes des employés de son département ET de sa société
              $absences = AbsenceRequest::with(['user.departement'])
-                 ->whereHas('user', function ($query) use ($user) {
-                     $query->where('departement_id', $user->departement_id);
+                 ->whereHas('user', function ($query) use ($authUser, $societeId) {
+                     $query->where('departement_id', $authUser->departement_id)
+                           ->where('societe_id', $societeId);
                  })
                  ->get();
-     
-         } elseif ($user->hasRole('RH')) {
-             // RH : toutes les demandes
-             $absences = AbsenceRequest::with(['user.departement'])->get();
-     
+ 
+         } elseif ($authUser->hasRole('RH')) {
+             // RH : toutes les demandes sans restriction
+             $absences = AbsenceRequest::with(['user.departement'])
+             ->whereHas('user', function ($query) use ($societeId) {
+                $query->where('societe_id', $societeId);
+            })
+             ->get();
+
+ 
          } else {
-             return response()->json(['message' => 'Role non autorisé'], 403);
+             return response()->json(['message' => 'Rôle non autorisé'], 403);
          }
-     
+ 
          return response()->json($absences);
      }
+ 
+
      
 
     /**
@@ -61,7 +70,7 @@ class AbsenceRequestController extends Controller
             'dateDebut' => 'required|date',
             'dateFin' => 'required|date|after_or_equal:dateDebut',
             'motif' => 'nullable|string',
-            'statut' => 'required|in:en_attente,validé,rejeté',
+            'statut' => 'required|in:en_attente,validé,rejeté,approuvé',
             'justification' => 'nullable|file|mimes:jpeg,png,pdf|max:2048', 
         ];
     
@@ -122,48 +131,81 @@ class AbsenceRequestController extends Controller
         //
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(AbsenceRequest $absenceRequest)
+
+    public function update(Request $request, $id)
     {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-
-public function update(Request $request, $id)
-{
-    $absence = AbsenceRequest::findOrFail($id);
-
-    $absence->user_id = $request->input('user_id');
-    $absence->type = $request->input('type');
-    $absence->dateDebut = $request->input('dateDebut');
-    $absence->dateFin = $request->input('dateFin');
-    $absence->motif = $request->input('motif');
-    $absence->statut = $request->input('statut');
-
-    // Si un fichier justification est envoyé
-    if ($request->hasFile('justification')) {
-        // Supprimer l'ancien fichier s'il existe
-        if ($absence->justification && Storage::disk('public')->exists($absence->justification)) {
-            Storage::disk('public')->delete($absence->justification);
+        $rules = [
+            'user_id' => 'sometimes|required|exists:users,id',
+            'type' => 'sometimes|required|in:Congé,maladie,autre',
+            'dateDebut' => 'sometimes|required|date',
+            'dateFin' => 'sometimes|required|date|after_or_equal:dateDebut',
+            'motif' => 'nullable|string',
+            'statut' => 'sometimes|required|in:en_attente,validé,rejeté,approuvé',
+            'justification' => 'nullable',
+        ];
+    
+        $validator = validator($request->all(), $rules);
+    
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], 422);
         }
-
-        // Enregistrer le nouveau fichier
-        $path = $request->file('justification')->store('justifications', 'public');
-        $absence->justification = $path;
+    
+        $absence = AbsenceRequest::findOrFail($id);
+    
+        $validatedData = $validator->validated();
+    
+        // Mise à jour des champs présents dans la requête validée
+        if (isset($validatedData['user_id'])) {
+            $absence->user_id = $validatedData['user_id'];
+        }
+        if (isset($validatedData['type'])) {
+            $absence->type = $validatedData['type'];
+        }
+        if (isset($validatedData['dateDebut'])) {
+            $absence->dateDebut = $validatedData['dateDebut'];
+        }
+        if (isset($validatedData['dateFin'])) {
+            $absence->dateFin = $validatedData['dateFin'];
+        }
+        if (isset($validatedData['motif'])) {
+            $absence->motif = $validatedData['motif'];
+        }
+        if (isset($validatedData['statut'])) {
+            $absence->statut = $validatedData['statut'];
+        }
+    
+        // Gestion du fichier justification
+        if ($request->hasFile('justification')) {
+            // Supprimer l'ancien fichier s'il existe
+            if ($absence->justification && Storage::disk('public')->exists($absence->justification)) {
+                Storage::disk('public')->delete($absence->justification);
+            }
+    
+            // Enregistrer le nouveau fichier
+            $path = $request->file('justification')->store('justifications', 'public');
+            $absence->justification = $path;
+    
+        } else if ($request->input('justification') === null) {
+            // Si le champ `justification` est explicitement `null`, supprimer le fichier existant
+            if ($absence->justification && Storage::disk('public')->exists($absence->justification)) {
+                Storage::disk('public')->delete($absence->justification);
+            }
+            $absence->justification = null;
+    
+        } else if (is_string($request->input('justification'))) {
+            // Si la justification est une chaîne de caractères (lien existant), conserver sans modification
+            $absence->justification = $absence->justification;
+        }
+    
+        $absence->save();
+    
+        return response()->json([
+            'message' => 'Demande mise à jour avec succès.',
+            'absence' => $absence
+        ]);
     }
-
-    $absence->save();
-
-    return response()->json([
-        'message' => 'Demande mise à jour avec succès.',
-        'absence' => $absence
-    ]);
-}
+    
+     
 
 
 

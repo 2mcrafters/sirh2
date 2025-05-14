@@ -2,6 +2,8 @@ import { Icon } from "@iconify/react/dist/iconify.js";
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from 'react-redux';
 import { updateUser } from '../Redux/Slices/userSlice'; 
+import { fetchSocietes } from "../Redux/Slices/societeSlice"; // Ajouter l'importation pour fetchSocietes
+import { fetchDepartments } from "../Redux/Slices/departementSlice"; // Assurez-vous que fetchDepartments est importé si ce n'est pas déjà le cas
 
 const ViewProfileLayer = () => {
   const apiUrl = import.meta.env.VITE_API_URL;
@@ -9,10 +11,18 @@ const ViewProfileLayer = () => {
   const { user } = useSelector((state) => state.auth);
   const { status, error } = useSelector((state) => state.users);
   const { items: departments } = useSelector((state) => state.departments);
+  const { items: societes } = useSelector(state => state.societes); // Récupérer les sociétés
+
   const getDepartmentName = (id) => {
     const dept = departments.find((d) => d.id === id);
     return dept ? dept.nom : "Département inconnu";
   };
+
+  const getSocieteName = (id) => { // Fonction pour obtenir le nom de la société
+    const soc = societes.find((s) => s.id === id);
+    return soc ? soc.nom : "Société inconnue";
+  };
+
   // État local pour le formulaire
   const [formData, setFormData] = useState({});
   const [imagePreview, setImagePreview] = useState(
@@ -39,6 +49,8 @@ const ViewProfileLayer = () => {
 
   // Initialiser le formulaire avec les données utilisateur
   useEffect(() => {
+    dispatch(fetchSocietes()); // Dispatch pour récupérer les sociétés
+    dispatch(fetchDepartments()); // Dispatch pour récupérer les départements
     if (user) {
       setFormData({
         name: user.name || '',
@@ -54,10 +66,11 @@ const ViewProfileLayer = () => {
         nbEnfants: user.nbEnfants || 0,
         adresse: user.adresse || '',
         typeContrat: user.typeContrat || '',
-        role: user.role || ''
+        role: user.role || '',
+        societe_id: user.societe_id || '' // Ajouter societe_id
       });
     }
-  }, [user]);
+  }, [user, dispatch]);
 
   // Gestion des changements dans le formulaire
   const handleInputChange = (e) => {
@@ -188,34 +201,31 @@ const ViewProfileLayer = () => {
                   <span className='w-30 text-md fw-semibold text-primary-light'>
                     Nom Complet
                   </span>
-                  <span className='w-70 text-secondary-light fw-medium'>
-                    : {formData.name} {formData.prenom}
-                  </span>
+                  <span className='text-md text-primary-light'>: {formData.name} {formData.prenom}</span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
                   <span className='w-30 text-md fw-semibold text-primary-light'>
                     Email
                   </span>
-                  <span className='w-70 text-secondary-light fw-medium'>
-                    : {formData.email}
-                  </span>
+                  <span className='text-md text-primary-light'>: {formData.email}</span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
                   <span className='w-30 text-md fw-semibold text-primary-light'>
                     Téléphone
                   </span>
-                  <span className='w-70 text-secondary-light fw-medium'>
-                    : {formData.tel}
-                  </span>
+                  <span className='text-md text-primary-light'>: {formData.tel}</span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
                   <span className='w-30 text-md fw-semibold text-primary-light'>
                     Département
                   </span>
-                  <span className='w-70 text-secondary-light fw-medium'>
-                  : {getDepartmentName(formData.departement_id)}
-
+                  <span className='text-md text-primary-light'>: {getDepartmentName(formData.departement_id)}</span>
+                </li>
+                <li className='d-flex align-items-center gap-1 mb-12'>
+                  <span className='w-30 text-md fw-semibold text-primary-light'>
+                    Société
                   </span>
+                  <span className='text-md text-primary-light'>: {getSocieteName(formData.societe_id)}</span>
                 </li>
                 <li className='d-flex align-items-center gap-1 mb-12'>
                   <span className='w-30 text-md fw-semibold text-primary-light'>
@@ -281,7 +291,7 @@ const ViewProfileLayer = () => {
                     : {formData.typeContrat}
                   </span>
                 </li>
-                <li className='d-flex align-items-center gap-1'>
+                <li className='d-flex align-items-center'>
                   <span className='w-30 text-md fw-semibold text-primary-light'>
                     Rôle
                   </span>
@@ -599,6 +609,25 @@ const ViewProfileLayer = () => {
                         />
                       </div>
                     </div>
+                    <div className="col-sm-6">
+                      <div className='mb-20'>
+                        <label
+                          htmlFor='societe'
+                          className='form-label fw-semibold text-primary-light text-sm mb-8'
+                        >
+                          Société
+                        </label>
+                        <input
+                          type='text'
+                          className='form-control radius-8'
+                          id='societe_id'
+                          placeholder="societe"
+                          value={getSocieteName(formData.societe_id)}
+                          onChange={handleInputChange}
+                          readOnly
+                        />
+                      </div>
+                      </div>
                     <div className='col-sm-12'>
                       <div className='mb-20'>
                         <label

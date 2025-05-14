@@ -1,64 +1,187 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
-import { fetchPointages, deletePointages, updatePointage, createPointage } from '../Redux/Slices/pointageSlice';
+import { fetchPointages, deletePointages, updatePointage, createPointage, validerPointage, invaliderPointage } from '../Redux/Slices/pointageSlice';
 import { fetchUsers } from '../Redux/Slices/userSlice';
 import { fetchAbsenceRequests } from '../Redux/Slices/absenceRequestSlice';
+import { fetchSocietes } from '../Redux/Slices/societeSlice'; // Ajout de l'import pour fetchSocietes
+import { fetchDepartments } from '../Redux/Slices/departementSlice';
 import { Icon } from '@iconify/react/dist/iconify.js';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+
 
 const PointagesListPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { items: pointages, status: loading, error } = useSelector((state) => state.pointages);
   const { items: users } = useSelector((state) => state.users);
+  const { items: societes } = useSelector((state) => state.societes); // Récupération des sociétés
   const { items: absenceRequests } = useSelector((state) => state.absenceRequests);
-  const [selectedPointages, setSelectedPointages] = useState([]);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const { items: departments } = useSelector((state) => state.departments);
+  const { user: currentUser } = useSelector((state) => state.auth); // Récupérer l'utilisateur actuel
+  const canValidateAll = currentUser && ['RH', 'Chef_Dep', 'Chef_Projet'].includes(currentUser.role);
+  const canInvalidateAllForRH = currentUser && currentUser.role === 'RH'; // Ajout pour le bouton Invalider Tout
+
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [filters, setFilters] = useState({
     date: '',
     user: '',
     status: '',
+    societe: '', // Ajout du filtre société
   });
-  const [showExportDropdown, setShowExportDropdown] = useState(false);
-  const [showImportDropdown, setShowImportDropdown] = useState(false);
+  
   const [editablePointages, setEditablePointages] = useState({});
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [usersForPointage, setUsersForPointage] = useState([]);
+  const [usersWithAbsence, setUsersWithAbsence] = useState([]);
 
   useEffect(() => {
     dispatch(fetchPointages());
     dispatch(fetchUsers());
     dispatch(fetchAbsenceRequests());
+    dispatch(fetchSocietes()); // Appel pour récupérer les sociétés
+    dispatch(fetchDepartments());
   }, [dispatch]);
+  const handleInvaliderTout = async () => {
+    console.log("Pointages affichés (currentItems) : ", currentItems);
+  
+    // Sélectionner les pointages affichés qui sont validés
+    const pointagesAInvalider = currentItems.filter(p => p.valider === 1);
+  
+    if (pointagesAInvalider.length === 0) {
+      Swal.fire('Information', 'Aucun pointage validé à invalider parmi les éléments affichés.', 'info');
+      return;
+    }
+  
+    const result = await Swal.fire({
+      title: 'Êtes-vous sûr ?',
+      text: `Vous êtes sur le point d'invalider ${pointagesAInvalider.length} pointage(s).`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Oui, invalider !',
+      cancelButtonText: 'Annuler'
+    });
+  
+    if (result.isConfirmed) {
+      try {
+        const promises = pointagesAInvalider.map(p => dispatch(invaliderPointage(p.id)).unwrap());
+        await Promise.all(promises);
+  
+        Swal.fire(
+          'Succès !',
+          `${pointagesAInvalider.length} pointage(s) ont été invalidés.`,
+          'success'
+        );
+  
+        dispatch(fetchPointages()); // Rafraîchir les données après l'invalidation
+      } catch (error) {
+        console.error("Erreur lors de l'invalidation : ", error);
+        Swal.fire('Erreur !', 'Une erreur est survenue lors de l\'invalidation.', 'error');
+      }
+    }
+  };
+
+  // Helper function to get the leave type and status
+  const getLeaveInfo = useCallback((userId) => {
+    const selectedDateObj = new Date(selectedDate);
+    
+    const userAbsence = absenceRequests.find(request => {
+      const startDate = new Date(request.dateDebut);
+      const endDate = new Date(request.dateFin);
+      return request.user_id === userId && 
+             request.statut === 'approuvé' &&
+             selectedDateObj >= startDate && 
+             selectedDateObj <= endDate;
+    });
+
+    if (userAbsence) {
+      return {
+        type: userAbsence.type,
+        motif: userAbsence.motif || 'N/A',
+        endDate: userAbsence.dateFin
+      };
+    }
+    return null;
+  }, [absenceRequests, selectedDate]);
 
   useEffect(() => {
-    if (users.length > 0) {
-      const initialPointages = {};
-      users.forEach(user => {
+    const activeFilteredUsers = users.filter(user => {
+      const userSociete = societes.find(s => s.id === user.societe_id);
+      const societeMatch = !filters.societe || (userSociete && userSociete.id === parseInt(filters.societe));
+      const userMatchFilter = !filters.user || user.id === parseInt(filters.user);
+      return user.statut !== 'Inactif' && societeMatch && userMatchFilter;
+    });
+
+    if (activeFilteredUsers.length > 0 && Array.isArray(absenceRequests)) {
+      const newEditablePointages = {};
+      const currentUsersForPointage = [];
+      const currentUsersWithAbsence = [];
+
+      activeFilteredUsers.forEach(user => {
         const existingPointage = pointages.find(p => 
           p.user_id === user.id && 
           new Date(p.date).toISOString().split('T')[0] === selectedDate
         );
         
-        initialPointages[user.id] = {
-          id: existingPointage?.id || null,
-          user_id: user.id,
-          date: selectedDate,
-          heureEntree: existingPointage?.heureEntree || '',
-          heureSortie: existingPointage?.heureSortie || '',
-          statutJour: existingPointage?.statutJour || '',
-          overtimeHours: existingPointage?.overtimeHours || 0
-        };
+        const userAbsenceInfo = getLeaveInfo(user.id);
+
+        if (userAbsenceInfo && (userAbsenceInfo.type === 'Congé' || userAbsenceInfo.type === 'maladie' || userAbsenceInfo.type === 'Autre absence')) {
+          newEditablePointages[user.id] = {
+            id: existingPointage?.id || null,
+            user_id: user.id,
+            date: selectedDate,
+            heureEntree: null, 
+            heureSortie: null, 
+            statutJour: userAbsenceInfo.type,
+            overtimeHours: 0, 
+            valider: existingPointage?.valider || 0,
+            isAbsent: true,
+            absenceEndDate: userAbsenceInfo.endDate
+          };
+          currentUsersWithAbsence.push({ 
+            ...user, 
+            absenceType: userAbsenceInfo.type, 
+            absenceMotif: userAbsenceInfo.motif,
+            absenceEndDate: userAbsenceInfo.endDate
+          });
+        } else {
+          newEditablePointages[user.id] = {
+            id: existingPointage?.id || null,
+            user_id: user.id,
+            date: selectedDate,
+            heureEntree: existingPointage?.heureEntree || '',
+            heureSortie: existingPointage?.heureSortie || '',
+            statutJour: existingPointage?.statutJour || (userAbsenceInfo ? userAbsenceInfo.type : ''),
+            overtimeHours: existingPointage?.overtimeHours || 0,
+            valider: existingPointage?.valider || 0,
+            isAbsent: !!userAbsenceInfo,
+            absenceEndDate: userAbsenceInfo ? userAbsenceInfo.endDate : null
+          };
+          if (!userAbsenceInfo || (userAbsenceInfo.type !== 'Congé' && userAbsenceInfo.type !== 'maladie' && userAbsenceInfo.type !== 'Autre absence')) {
+            currentUsersForPointage.push(user);
+          } else if (userAbsenceInfo) { 
+             currentUsersWithAbsence.push({ 
+                ...user, 
+                absenceType: userAbsenceInfo.type, 
+                absenceMotif: userAbsenceInfo.motif,
+                absenceEndDate: userAbsenceInfo.endDate
+             });
+          }
+        }
       });
-      setEditablePointages(initialPointages);
+      setEditablePointages(newEditablePointages);
+      setUsersForPointage(currentUsersForPointage);
+      setUsersWithAbsence(currentUsersWithAbsence);
+    } else {
+      setEditablePointages({});
+      setUsersForPointage([]);
+      setUsersWithAbsence([]);
     }
-  }, [users, pointages, selectedDate]);
+  }, [users, pointages, selectedDate, absenceRequests, filters, societes, getLeaveInfo]);
 
   // Filter pointages based on filters
   const filteredPointages = pointages.filter(pointage => {
@@ -68,7 +191,8 @@ const PointagesListPage = () => {
     return (
       (!filters.date || pointageDate.toDateString() === filterDate.toDateString()) &&
       (!filters.user || pointage.user_id === parseInt(filters.user)) &&
-      (!filters.status || pointage.statutJour === filters.status)
+      (!filters.status || pointage.statutJour === filters.status) &&
+      (!filters.societe || pointage.societe_id === parseInt(filters.societe)) // Ajout du filtre société
     );
   });
 
@@ -113,158 +237,7 @@ const PointagesListPage = () => {
     return pageNumbers;
   };
 
-  const handleEdit = (id) => {
-    navigate(`/pointages/${id}/edit`);
-  };
-
-  const handleDelete = async (id) => {
-    const result = await Swal.fire({
-      title: 'Êtes-vous sûr?',
-      text: "Cette action ne peut pas être annulée!",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Oui, supprimer!',
-      cancelButtonText: 'Annuler'
-    });
-
-    if (result.isConfirmed) {
-      try {
-        await dispatch(deletePointages([id])).unwrap();
-        Swal.fire(
-          'Supprimé!',
-          'Le pointage a été supprimé avec succès.',
-          'success'
-        );
-      } catch (error) {
-        Swal.fire(
-          'Erreur!',
-          'Une erreur est survenue lors de la suppression.',
-          'error'
-        );
-      }
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedPointages.length === 0) {
-      Swal.fire(
-        'Attention!',
-        'Veuillez sélectionner au moins un pointage à supprimer.',
-        'warning'
-      );
-      return;
-    }
-
-    const result = await Swal.fire({
-      title: 'Êtes-vous sûr?',
-      text: `Vous êtes sur le point de supprimer ${selectedPointages.length} pointage(s). Cette action ne peut pas être annulée!`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Oui, supprimer!',
-      cancelButtonText: 'Annuler'
-    });
-
-    if (result.isConfirmed) {
-      try {
-        await dispatch(deletePointages(selectedPointages)).unwrap();
-        setSelectedPointages([]);
-        Swal.fire(
-          'Supprimé!',
-          'Les pointages ont été supprimés avec succès.',
-          'success'
-        );
-      } catch (error) {
-        Swal.fire(
-          'Erreur!',
-          'Une erreur est survenue lors de la suppression.',
-          'error'
-        );
-      }
-    }
-  };
-
-  const togglePointageSelection = (id) => {
-    setSelectedPointages(prev => 
-      prev.includes(id) 
-        ? prev.filter(pointageId => pointageId !== id)
-        : [...prev, id]
-    );
-  };
-
-  // Export to Excel
-  const exportToExcel = () => {
-    const data = filteredPointages.map(pointage => {
-      const user = users.find(u => u.id === pointage.user_id);
-      return {
-        'Employé': user ? `${user.name} ${user.prenom}` : 'Inconnu',
-        'Date': new Date(pointage.date).toLocaleDateString(),
-        'Heure d\'entrée': pointage.heureEntree || '-',
-        'Heure de sortie': pointage.heureSortie || '-',
-        'Statut': getStatusLabel(pointage.statutJour),
-        'Heures supplémentaires': pointage.overtimeHours || '0'
-      };
-    });
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Pointages');
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(dataBlob, 'pointages.xlsx');
-  };
-
-  // Export to PDF
-  const exportToPDF = () => {
-    const doc = new jsPDF();
-    
-    // Add title
-    doc.setFontSize(16);
-    doc.text('Liste des Pointages', 14, 15);
-    
-    // Add date
-    doc.setFontSize(10);
-    doc.text(`Généré le: ${new Date().toLocaleDateString()}`, 14, 22);
-
-    const tableColumn = ['Employé', 'Date', 'Heure d\'entrée', 'Heure de sortie', 'Statut', 'Heures supplémentaires'];
-    const tableRows = filteredPointages.map(pointage => {
-      const user = users.find(u => u.id === pointage.user_id);
-      return [
-        user ? `${user.name} ${user.prenom}` : 'Inconnu',
-        new Date(pointage.date).toLocaleDateString(),
-        pointage.heureEntree || '-',
-        pointage.heureSortie || '-',
-        getStatusLabel(pointage.statutJour),
-        pointage.overtimeHours || '0'
-      ];
-    });
-
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 30,
-      theme: 'grid',
-      headStyles: { 
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        fontSize: 10,
-        fontStyle: 'bold'
-      },
-      bodyStyles: {
-        fontSize: 9
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245]
-      },
-      margin: { top: 30 }
-    });
-
-    doc.save('pointages.pdf');
-  };
-
+ 
   // Import from Excel
   const handleFileImport = (event) => {
     const file = event.target.files[0];
@@ -370,43 +343,75 @@ const PointagesListPage = () => {
     }
   };
 
+  const handleValiderTout = async () => {
+    const pointagesAValider = Object.values(editablePointages).filter(
+      p => p.id && p.valider === 0 && p.statutJour !== 'absent' && p.statutJour !== ''
+    );
+
+    if (pointagesAValider.length === 0) {
+      Swal.fire('Information', 'Aucun pointage à valider pour la date sélectionnée.', 'info');
+      return;
+    }
+
+    try {
+      Swal.fire({
+        title: 'Validation en cours...',
+        text: `Validation de ${pointagesAValider.length} pointage(s).`,
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      const validationPromises = pointagesAValider.map(p => dispatch(validerPointage(p.id)).unwrap());
+      await Promise.all(validationPromises);
+
+      setEditablePointages(prev => {
+        const updatedPointages = { ...prev };
+        pointagesAValider.forEach(pToValidate => {
+          const userIdKey = Object.keys(prev).find(key => prev[key].id === pToValidate.id);
+          if (userIdKey) {
+            updatedPointages[userIdKey] = { ...updatedPointages[userIdKey], valider: 1 };
+          }
+        });
+        return updatedPointages;
+      });
+      
+      Swal.fire('Succès!', `${pointagesAValider.length} pointage(s) validé(s) avec succès.`, 'success');
+      dispatch(fetchPointages()); // Rafraîchir les données
+    } catch (error) {
+      console.error("Erreur lors de la validation groupée:", error);
+      let errorMessage = 'Une erreur est survenue lors de la validation des pointages.';
+      if (error.message) {
+        errorMessage += ` Détails: ${error.message}`;
+      } else if (typeof error === 'string') {
+        errorMessage += ` Détails: ${error}`;
+      }
+      Swal.fire('Erreur!', errorMessage, 'error');
+    }
+  };
+
   const handleSaveAll = async () => {
     try {
-      // Check if any user is missing a status
-      const usersWithoutStatus = Object.values(editablePointages)
-        .filter(pointage => !pointage.statutJour)
-        .map(pointage => {
-          const user = users.find(u => u.id === pointage.user_id);
-          return user ? `${user.name} ${user.prenom}` : 'Utilisateur inconnu';
-        });
-
-      if (usersWithoutStatus.length > 0) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'Statut manquant',
-          html: `
-            <p>Veuillez sélectionner un statut pour les utilisateurs suivants :</p>
-            <ul>
-              ${usersWithoutStatus.map(user => `<li>${user}</li>`).join('')}
-            </ul>
-          `,
-          confirmButtonText: 'OK'
-        });
-        return;
-      }
-
       const updates = Object.values(editablePointages)
         .filter(pointage => {
+          // Ignorer les absences (Congé, Maladie, Autre absence)
+          const ignoreStatuses = ['Congé', 'maladie', 'Autre absence'];
+          if (ignoreStatuses.includes(pointage.statutJour)) {
+            console.warn(`Ignoré : ${pointage.user_id} - ${pointage.statutJour}`);
+            return false;
+          }
+  
           // Get the original pointage if it exists
           const originalPointage = pointages.find(p => 
             p.user_id === pointage.user_id && 
             new Date(p.date).toISOString().split('T')[0] === selectedDate
           );
-
-          // If no original pointage exists, save it
+  
+          // Si le pointage n'existe pas, l'enregistrer
           if (!originalPointage) return true;
-
-          // If any field has changed, save it
+  
+          // Si les données ont changé, l'enregistrer
           return (
             originalPointage.statutJour !== pointage.statutJour ||
             originalPointage.heureEntree !== pointage.heureEntree ||
@@ -415,60 +420,86 @@ const PointagesListPage = () => {
           );
         })
         .map(pointage => {
-          const pointageData = {
+          return {
             id: pointage.id,
             user_id: pointage.user_id,
             date: selectedDate,
             heureEntree: pointage.statutJour === 'absent' ? null : pointage.heureEntree,
             heureSortie: pointage.statutJour === 'absent' ? null : pointage.heureSortie,
             statutJour: pointage.statutJour,
-            overtimeHours: pointage.statutJour === 'absent' ? 0 : pointage.overtimeHours
+            overtimeHours: pointage.statutJour === 'absent' ? 0 : pointage.overtimeHours,
           };
-          return pointageData;
         });
-
+  
       if (updates.length === 0) {
         Swal.fire({
           icon: 'info',
-          title: 'Information',
-          text: 'Aucun pointage à sauvegarder',
+          title: 'Aucun pointage actif à sauvegarder',
           timer: 2000,
-          showConfirmButton: false
+          showConfirmButton: false,
         });
         return;
       }
-
+  
       const existingPointages = updates.filter(pointage => pointage.id);
-      
+      const newPointages = updates.filter(pointage => !pointage.id);
+  
       if (existingPointages.length > 0) {
         await dispatch(updatePointage(existingPointages)).unwrap();
       }
-
-      const newPointages = updates.filter(pointage => !pointage.id);
+  
       if (newPointages.length > 0) {
-        await Promise.all(newPointages.map(pointage => 
-          dispatch(createPointage(pointage)).unwrap()
-        ));
+        await Promise.all(newPointages.map(pointage => dispatch(createPointage(pointage)).unwrap()));
       }
-
+  
       await dispatch(fetchPointages()).unwrap();
-      
+  
       Swal.fire({
         icon: 'success',
         title: 'Succès',
-        text: 'Les pointages ont été sauvegardés avec succès',
+        text: 'Les pointages actifs ont été sauvegardés avec succès',
         timer: 2000,
-        showConfirmButton: false
+        showConfirmButton: false,
       });
+  
     } catch (error) {
-      console.error('Error saving all pointages:', error);
+      console.error('Error saving active pointages:', error);
       Swal.fire({
         icon: 'error',
         title: 'Erreur',
-        text: error.message || 'Une erreur est survenue lors de la sauvegarde des pointages',
+        text: 'Une erreur est survenue lors de la sauvegarde des pointages actifs',
         timer: 2000,
-        showConfirmButton: false
+        showConfirmButton: false,
       });
+    }
+  };
+  
+
+  const handleValiderPointage = async (pointageId) => {
+    if (!pointageId) {
+      Swal.fire('Erreur!', 'ID de pointage manquant pour la validation.', 'error');
+      return;
+    }
+    try {
+      await dispatch(validerPointage(pointageId)).unwrap();
+      dispatch(fetchPointages()); 
+      Swal.fire('Validé!', 'Le pointage a été validé.', 'success');
+    } catch (err) {
+      Swal.fire('Erreur!', err.message || 'La validation du pointage a échoué.', 'error');
+    }
+  };
+
+  const handleInvaliderPointage = async (pointageId) => {
+    if (!pointageId) {
+      Swal.fire('Erreur!', 'ID de pointage manquant pour l\'invalidation.', 'error');
+      return;
+    }
+    try {
+      await dispatch(invaliderPointage(pointageId)).unwrap();
+      dispatch(fetchPointages());
+      Swal.fire('Invalidé!', 'Le pointage a été invalidé.', 'success');
+    } catch (err) {
+      Swal.fire('Erreur!', err.message || 'L\'invalidation du pointage a échoué.', 'error');
     }
   };
 
@@ -500,32 +531,6 @@ const PointagesListPage = () => {
     
     console.log('Is user on leave:', isOnLeave);
     return isOnLeave;
-  };
-
-  // Helper function to get the leave type and status
-  const getLeaveInfo = (userId) => {
-    const selectedDateObj = new Date(selectedDate);
-    console.log('Getting leave info for user:', userId, 'on date:', selectedDate);
-    
-    const request = absenceRequests.find(request => {
-      const startDate = new Date(request.dateDebut);
-      const endDate = new Date(request.dateFin);
-      return request.user_id === userId && 
-             request.statut === 'validé' &&
-             (request.type === 'Congé' || request.type === 'maladie') &&
-             selectedDateObj >= startDate && 
-             selectedDateObj <= endDate;
-    });
-
-    console.log('Found leave request:', request);
-    if (request) {
-      return {
-        type: request.type,
-        startDate: request.dateDebut,
-        endDate: request.dateFin
-      };
-    }
-    return null;
   };
 
   if (loading === 'loading') {
@@ -569,10 +574,34 @@ const PointagesListPage = () => {
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
           />
-          <button className="btn btn-primary" onClick={handleSaveAll}>
+          <button 
+            className="btn btn-primary" 
+            onClick={handleSaveAll}
+            disabled={currentUser && currentUser.role === 'Employe'} // Désactiver si l'utilisateur est un employé
+          >
             <Icon icon="mdi:content-save-all" className="me-1" />
             Sauvegarder tout
           </button>
+          {canValidateAll && (
+            <button 
+              className="btn btn-success btn-sm me-2"
+              onClick={() => handleValiderTout(currentItems.filter(p => p.valider === 0).map(p => p.id))}
+              disabled={currentItems.filter(p => p.valider === 0).length === 0}
+            >
+              <Icon icon="mdi:check-all" className="me-1" /> Valider Tout
+            </button>
+          )}
+          {canInvalidateAllForRH && (
+  <button 
+    className="btn btn-warning btn-sm me-2"
+    onClick={handleInvaliderTout}
+    disabled={!currentItems.some(p => p.valider === 1)}  // Utilise `some()` pour vérifier s'il y a au moins un pointage validé
+  >
+    <Icon icon="mdi:close-octagon-outline" className="me-1" /> Invalider Tout (RH)
+  </button>
+)}
+
+
         </div>
       </div>
       <div className="card-body">
@@ -589,87 +618,122 @@ const PointagesListPage = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => {
+              {usersForPointage.map((user) => {
                 const pointage = editablePointages[user.id] || {};
-                const isOnLeave = isUserOnLeave(user.id);
-                const leaveInfo = getLeaveInfo(user.id);
                 
+                const isPointageValidatedByAPI = pointage && pointage.valider === 1;
+                const pointageExistsWithId = pointage && pointage.id;
+
+                let currentDisableFields = pointage.isAbsent || false; 
+
+                if (isPointageValidatedByAPI) {
+                    currentDisableFields = true; 
+                } else if (currentUser && currentUser.role === 'Employe') {
+                    if (pointageExistsWithId) {
+                        currentDisableFields = true; 
+                    } else {
+                        currentDisableFields = pointage.isAbsent || false; 
+                    }
+                }
+                
+                const disableSaveButton = currentDisableFields || !pointage.statutJour;
+
                 return (
                   <tr key={user.id}>
                     <td>
                       {user.name} {user.prenom}
-                      {isOnLeave && leaveInfo && (
+                      {pointage.isAbsent && pointage.statutJour && (pointage.statutJour === 'Congé' || pointage.statutJour === 'maladie' || pointage.statutJour === 'Autre absence') && pointage.absenceEndDate && (
                         <span className={`badge ms-2 ${
-                          leaveInfo.type === 'Congé' ? 'bg-info' : 'bg-warning'
+                          pointage.statutJour === 'Congé' ? 'bg-success' : 
+                          pointage.statutJour === 'maladie' ? 'bg-warning' : 
+                          pointage.statutJour === 'Autre absence' ? 'bg-info' : 'bg-secondary'
                         }`}>
-                          {leaveInfo.type === 'Congé' ? 'En congé' : 'Malade'}
-                          <small className="ms-1">
-                            ({new Date(leaveInfo.startDate).toLocaleDateString()} - {new Date(leaveInfo.endDate).toLocaleDateString()})
-                          </small>
+                          {pointage.statutJour} (jusqu'au {new Date(pointage.absenceEndDate).toLocaleDateString()})
                         </span>
                       )}
                     </td>
                     <td>
-                      <select
-                        className={`form-select ${
-                          pointage.statutJour === 'present' ? 'text-success' :
-                          pointage.statutJour === 'absent' ? 'text-danger' :
-                          pointage.statutJour === 'retard' ? 'text-warning' : ''
-                        }`}
-                        value={pointage.statutJour || ''}
-                        onChange={(e) => {
-                          const newStatus = e.target.value;
-                          handleFieldChange(user.id, 'statutJour', newStatus);
-                          if (newStatus === 'absent') {
-                            handleFieldChange(user.id, 'heureEntree', '');
-                            handleFieldChange(user.id, 'heureSortie', '');
-                          }
-                        }}
-                        disabled={isOnLeave}
-                      >
-                        <option value="">Sélectionner un statut</option>
-                        <option value="present" className="text-success">Présent</option>
-                        <option value="absent" className="text-danger">Absent</option>
-                        <option value="retard" className="text-warning">Retard</option>
-                      </select>
+                      {pointage.isAbsent && (pointage.statutJour === 'Congé' || pointage.statutJour === 'maladie' || pointage.statutJour === 'Autre absence') ? (
+                        <span className={`text-capitalize fw-bold ${
+                          pointage.statutJour === 'Congé' ? 'text-success' : 
+                          pointage.statutJour === 'maladie' ? 'text-warning' : 
+                          pointage.statutJour === 'Autre absence' ? 'text-info' : 'text-muted'
+                        }`}>
+                          {pointage.statutJour}
+                        </span>
+                      ) : (
+                        <select 
+                          className="form-select"
+                          value={pointage.statutJour || ''}
+                          onChange={(e) => handleFieldChange(user.id, 'statutJour', e.target.value)}
+                          disabled={currentDisableFields}
+                        >
+                          <option value="">Sélectionner...</option>
+                          <option value="present">Présent</option>
+                          <option value="absent">Absent</option>
+                          <option value="retard">Retard</option>
+                        </select>
+                      )}
                     </td>
                     <td>
-                      <input
-                        type="time"
+                      <input 
+                        type="time" 
                         className="form-control"
                         value={pointage.heureEntree || ''}
                         onChange={(e) => handleFieldChange(user.id, 'heureEntree', e.target.value)}
-                        disabled={pointage.statutJour === 'absent' || isOnLeave}
+                        disabled={currentDisableFields || pointage.statutJour === 'absent'}
                       />
                     </td>
                     <td>
-                      <input
-                        type="time"
+                      <input 
+                        type="time" 
                         className="form-control"
                         value={pointage.heureSortie || ''}
                         onChange={(e) => handleFieldChange(user.id, 'heureSortie', e.target.value)}
-                        disabled={pointage.statutJour === 'absent' || isOnLeave}
+                        disabled={currentDisableFields || pointage.statutJour === 'absent'}
                       />
                     </td>
                     <td>
-                      <input
-                        type="number"
+                      <input 
+                        type="number" 
                         className="form-control"
                         value={pointage.overtimeHours || 0}
-                        onChange={(e) => handleFieldChange(user.id, 'overtimeHours', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => handleFieldChange(user.id, 'overtimeHours', parseInt(e.target.value))}
+                        disabled={currentDisableFields || pointage.statutJour === 'absent'}
                         min="0"
-                        step="0.5"
-                        disabled={pointage.statutJour === 'absent' || isOnLeave}
                       />
                     </td>
                     <td>
-                      <button
-                        className="btn btn-primary btn-sm"
+                      <button 
+                        className="btn btn-sm btn-success me-2"
                         onClick={() => handleSavePointage(user.id)}
-                        disabled={isOnLeave}
+                        disabled={disableSaveButton}
+                        title="Sauvegarder"
                       >
                         <Icon icon="mdi:content-save" />
                       </button>
+                        {/* Bouton Valider */}
+                        {pointageExistsWithId && !isPointageValidatedByAPI && currentUser &&
+                          (currentUser.role === 'RH' || currentUser.role === 'Chef_Dep' || currentUser.role === 'Chef_Projet') && (
+                          <button
+                            className="btn btn-success btn-sm me-1"
+                            onClick={() => handleValiderPointage(pointage.id)}
+                            disabled={currentDisableFields}
+                          >
+                            <Icon icon="ph:check-circle-duotone" /> Valider
+                          </button>
+                        )}
+
+                        {/* Bouton Invalider */}
+                        {pointageExistsWithId && isPointageValidatedByAPI && currentUser && currentUser.role === 'RH' && (
+                          <button
+                            className="btn btn-warning btn-sm"
+                            onClick={() => handleInvaliderPointage(pointage.id)}
+                            disabled={currentDisableFields && currentUser.role !== 'RH'} // Maintenu pour cohérence, se simplifie à disabled={false} quand visible
+                          >
+                            <Icon icon="ph:x-circle-duotone" /> Invalider
+                          </button>
+                        )}
                     </td>
                   </tr>
                 );
@@ -677,6 +741,49 @@ const PointagesListPage = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Table for users with validated absence */}
+        {usersWithAbsence.length > 0 && (
+          <div className="mt-4">
+            <h5 className="mb-3">Employés avec absence validée le {new Date(selectedDate).toLocaleDateString()}</h5>
+            <div className="table-responsive">
+              <table className="table table-bordered table-striped table-hover">
+                <thead className="table-info">
+                  <tr>
+                    <th>Employé</th>
+                    <th>Type d'absence</th>
+                    <th>Motif</th>
+                    <th>Département</th>
+                    <th>Société</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usersWithAbsence.map(absentUser => {
+                    const department = departments.find(d => d.id === absentUser.departement_id);
+                    const societe = societes.find(s => s.id === absentUser.societe_id);
+                    return (
+                      <tr key={absentUser.id}>
+                        <td>{absentUser.name} {absentUser.prenom}</td>
+                        <td>
+                          <span className={`badge bg-${
+                            absentUser.absenceType === 'Congé' ? 'success' : 
+                            absentUser.absenceType === 'maladie' ? 'warning' : 
+                            absentUser.absenceType === 'Autre absence' ? 'info' : 'secondary'
+                          }`}>
+                            {absentUser.absenceType}
+                          </span>
+                        </td>
+                        <td>{absentUser.absenceMotif || 'N/A'}</td>
+                        <td>{department ? department.nom : 'N/A'}</td>
+                        <td>{societe ? societe.nom : 'N/A'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -708,4 +815,4 @@ const getStatusBadgeColor = (status) => {
   }
 };
 
-export default PointagesListPage; 
+export default PointagesListPage;

@@ -1,64 +1,65 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
-import { fetchAbsenceRequests, deleteAbsenceRequests } from '../Redux/Slices/absenceRequestSlice';
-import { fetchUsers } from '../Redux/Slices/userSlice';
+import { fetchUsersTemp,fetchUsers, deleteUsers } from '../Redux/Slices/userSlice';
 import { Icon } from '@iconify/react/dist/iconify.js';
 import Swal from 'sweetalert2';
+import api from '../config/axios';
+import { affectUser } from '../Redux/Slices/userSlice';
 
-const AbsenceRequestsListPage = () => {
+const TemporaireEmployesPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { items: absenceRequests, status: loading, error } = useSelector((state) => state.absenceRequests);
-  const { items: users } = useSelector((state) => state.users);
-  const [selectedRequests, setSelectedRequests] = useState([]);
+  const { UserTemp: users, status: loading, error } = useSelector((state) => state.users);
+  const { items: departments } = useSelector((state) => state.departments);
+  const { user: currentUser } = useSelector((state) => state.auth); // Ajout de l'utilisateur connecté
+  const [selectedUsers, setSelectedUsers] = useState([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [type, setType] = useState('');
+  const [role, setRole] = useState('');
+  const [department, setDepartment] = useState('');
   const [status, setStatus] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const roles = useSelector((state) => state.auth.roles || []);
+  const isEmployee = roles.includes('Employe');  // Vérifie si le rôle est "EMPLOYE"
 
-  // useEffect(() => {
-  //   dispatch(fetchAbsenceRequests());
-  //   dispatch(fetchUsers());
-  // }, [dispatch]);
 
   // Ajouter la fonction de réinitialisation des filtres
   const resetFilters = () => {
-    setType('');
+    setRole('');
+    setDepartment('');
     setStatus('');
     setSearchTerm('');
     setCurrentPage(1);
   };
 
-  // Ajouter la logique de filtrage
-  const filteredRequests = absenceRequests.filter((request) => {
-    const user = users.find(u => u.id === request.user_id);
-    const userName = user ? `${user.name} ${user.prenom}`.toLowerCase() : '';
-    const searchLower = searchTerm.toLowerCase();
-    
-    const matchesSearch = userName.includes(searchLower) || 
-                         request.type.toLowerCase().includes(searchLower) ||
-                         request.motif?.toLowerCase().includes(searchLower);
-    
-    const matchesType = !type || request.type.toLowerCase() === type.toLowerCase();
-    const matchesStatus = !status || request.statut.toLowerCase() === status.toLowerCase();
+  // Ajout de la fonction de filtrage
+  const filteredUsers = users.filter((user) => {
+    const searchTermLower = searchTerm.toLowerCase();
+    const matchesSearch = 
+      user.name.toLowerCase().includes(searchTermLower) ||
+      user.prenom.toLowerCase().includes(searchTermLower) ||
+      user.cin?.toLowerCase().includes(searchTermLower) ||
+      user.email.toLowerCase().includes(searchTermLower);
 
-    return matchesSearch && matchesType && matchesStatus;
+    const matchesRole = !role || user.role.toLowerCase() === role.toLowerCase();
+    const matchesDepartment = !department || user.departement_id === parseInt(department);
+    const matchesStatus = !status || user.statut.toLowerCase() === status.toLowerCase();
+
+    return matchesSearch && matchesRole && matchesDepartment && matchesStatus;
   });
 
-  // Mise à jour des calculs de pagination pour utiliser les demandes filtrées
+  // Mise à jour des calculs de pagination pour utiliser les utilisateurs filtrés
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredRequests.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const currentItems = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   const handleItemsPerPageChange = (e) => {
-    const newItemsPerPage = e.target.value === 'all' ? filteredRequests.length : parseInt(e.target.value);
+    const newItemsPerPage = e.target.value === 'all' ? filteredUsers.length : parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
   };
@@ -91,7 +92,17 @@ const AbsenceRequestsListPage = () => {
   };
 
   const handleEdit = (id) => {
-    navigate(`/absences/${id}/edit`);
+    // Empêcher la modification si c'est l'utilisateur connecté
+    if (currentUser && currentUser.id === id) {
+      Swal.fire({
+        title: 'Action non autorisée',
+        text: 'Vous ne pouvez pas modifier votre profil depuis cette page. Veuillez utiliser la page de profil.',
+        icon: 'warning',
+        confirmButtonText: 'OK'
+      });
+      return;
+    }
+    navigate(`/users/${id}/edit`);
   };
 
   const handleDelete = async (id) => {
@@ -108,10 +119,10 @@ const AbsenceRequestsListPage = () => {
 
     if (result.isConfirmed) {
       try {
-        await dispatch(deleteAbsenceRequests([id])).unwrap();
+        await dispatch(deleteUsers([id])).unwrap();
         Swal.fire(
           'Supprimé!',
-          'La demande d\'absence a été supprimée avec succès.',
+          'L\'utilisateur a été supprimé avec succès.',
           'success'
         );
       } catch (error) {
@@ -125,10 +136,10 @@ const AbsenceRequestsListPage = () => {
   };
 
   const handleBulkDelete = async () => {
-    if (selectedRequests.length === 0) {
+    if (selectedUsers.length === 0) {
       Swal.fire(
         'Attention!',
-        'Veuillez sélectionner au moins une demande à supprimer.',
+        'Veuillez sélectionner au moins un utilisateur à supprimer.',
         'warning'
       );
       return;
@@ -136,7 +147,7 @@ const AbsenceRequestsListPage = () => {
 
     const result = await Swal.fire({
       title: 'Êtes-vous sûr?',
-      text: `Vous êtes sur le point de supprimer ${selectedRequests.length} demande(s). Cette action ne peut pas être annulée!`,
+      text: `Vous êtes sur le point de supprimer ${selectedUsers.length} utilisateur(s). Cette action ne peut pas être annulée!`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#3085d6',
@@ -147,11 +158,11 @@ const AbsenceRequestsListPage = () => {
 
     if (result.isConfirmed) {
       try {
-        await dispatch(deleteAbsenceRequests(selectedRequests)).unwrap();
-        setSelectedRequests([]);
+        await dispatch(deleteUsers(selectedUsers)).unwrap();
+        setSelectedUsers([]);
         Swal.fire(
           'Supprimé!',
-          'Les demandes ont été supprimées avec succès.',
+          'Les utilisateurs ont été supprimés avec succès.',
           'success'
         );
       } catch (error) {
@@ -164,10 +175,10 @@ const AbsenceRequestsListPage = () => {
     }
   };
 
-  const toggleRequestSelection = (id) => {
-    setSelectedRequests(prev => 
+  const toggleUserSelection = (id) => {
+    setSelectedUsers(prev => 
       prev.includes(id) 
-        ? prev.filter(reqId => reqId !== id)
+        ? prev.filter(userId => userId !== id)
         : [...prev, id]
     );
   };
@@ -192,7 +203,7 @@ const AbsenceRequestsListPage = () => {
                 <Icon icon="mdi:alert-circle" className="me-2" />
                 <div>
                   <h5 className="alert-heading">Erreur de chargement</h5>
-                  <p className="mb-0">Une erreur est survenue lors du chargement des demandes d'absence.</p>
+                  <p className="mb-0">Une erreur est survenue lors du chargement des utilisateurs.</p>
                 </div>
               </div>
             </div>
@@ -201,15 +212,66 @@ const AbsenceRequestsListPage = () => {
       </div>
     );
   }
+  
 
+  const handleAffectUser = (userId) => {
+    dispatch(affectUser({ userId}))
+      .unwrap()
+      .then(() => {
+        Swal.fire('Succès', 'Utilisateur affecté avec succès.', 'success');
+        dispatch(fetchUsersTemp());
+      })
+      .catch((error) => {
+        Swal.fire('Erreur', error, 'error');
+      });
+  };
+  
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0]; 
+  
+    if (!file) {
+      Swal.fire('Erreur', 'Veuillez sélectionner un fichier', 'error');
+      return;
+    }
+  
+    const formData = new FormData();
+    formData.append('file', file);
+  
+    try {
+      const response = await api.post('/import-employes', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+  
+      // Cas normal : succès HTTP 200
+      if (response.status === 200) {
+        Swal.fire('Succès', 'Fichier importé avec succès', 'success');
+        await dispatch(fetchUsersTemp());
+      }
+    } catch (error) {
+      const status = error?.response?.status;
+  
+      // ✅ Si le backend retourne 204 No Content ou 302 Redirect, on considère que l'import est OK
+      if (status === 204 || status === 302 || !error.response) {
+        Swal.fire('Import réussi', 'Employés importés (avec redirection ou sans réponse explicite).', 'success');
+        await dispatch(fetchUsersTemp());
+      } else {
+        console.error('Erreur lors de l’importation des employés:', error);
+        Swal.fire('Erreur', error?.response?.data?.message || 'Une erreur est survenue lors de l’importation.', 'error');
+      }
+    }
+  };
+  
   return (
     <div className="card basic-data-table">
       {/* Header */}
       <div className="card-header d-flex flex-column flex-md-row gap-2 justify-content-between align-items-start align-items-md-center">
-        <h5 className="card-title mb-0">Demandes d'absence</h5>
+        <h5 className="card-title mb-0">Employés Temporaire</h5>
 
         <div className="d-flex flex-wrap gap-2">
-          <Link to="/absences/add" className="btn btn-primary d-flex align-items-center">
+          <Link to="/users/add" className="btn btn-primary d-flex align-items-center">
             <Icon icon="mdi:plus" />
             <span className="d-none d-md-inline ms-1">Ajouter</span>
           </Link>
@@ -217,24 +279,39 @@ const AbsenceRequestsListPage = () => {
           <button 
             className="btn btn-danger d-flex align-items-center"
             onClick={handleBulkDelete}
-            disabled={selectedRequests.length === 0}
+            disabled={selectedUsers.length === 0}
           >
             <Icon icon="mdi:trash" />
             <span className="d-none d-md-inline ms-1">Supprimer</span>
           </button>
-          {(roles.includes("RH") || roles.includes("Chef_Dep")) && (
-       <>
-          <button className="btn btn-outline-secondary d-flex align-items-center">
-            <Icon icon="mdi:download" />
-            <span className="d-none d-md-inline ms-1">Export</span>
-          </button>
 
-          <button className="btn btn-outline-secondary d-flex align-items-center">
-            <Icon icon="mdi:upload" />
-            <span className="d-none d-md-inline ms-1">Import</span>
+          <button 
+  className="btn btn-outline-secondary d-flex align-items-center"
+  onClick={() => window.open(`${import.meta.env.VITE_API_URL}api/export-employes`, '_blank')}
+>
+  <Icon icon="mdi:download" />
+  <span className="d-none d-md-inline ms-1">Export</span>
+</button>
+
+          
+{!isEmployee && (     
+          <button
+            className="btn btn-outline-secondary d-flex align-items-center"
+            onClick={() => document.getElementById('fileInput').click()}
+          >
+          <Icon icon="mdi:upload" />
+          <span className="d-none d-md-inline ms-1">Import</span>
+          <input
+            type="file"
+            id="fileInput"
+            style={{ display: 'none' }}
+            onChange={handleImport}
+            accept=".csv, .xlsx"
+          />
           </button>
-          </>
-          )}
+)}
+        
+
           <button
             className="btn btn-outline-secondary d-inline d-md-none"
             onClick={() => setFiltersOpen(!filtersOpen)}
@@ -249,21 +326,30 @@ const AbsenceRequestsListPage = () => {
         <div className={`filters-container mb-4 ${filtersOpen ? 'd-block' : 'd-none'} d-md-block`}>
           <div className="row g-3 align-items-center">
             <div className="col-6 col-sm-4 col-md-3 col-lg-2">
-              <select className="form-select" value={type} onChange={e => setType(e.target.value)}>
-                <option value="">Type</option>
-                <option value="Congé">Congé</option>
-                <option value="maladie">Maladie</option>
-                <option value="autre">Autre</option>
+              <select className="form-select" value={role} onChange={e => setRole(e.target.value)}>
+                <option value="">Rôle</option>
+                <option value="Employe">Employé</option>
+                <option value="Chef_Dep">Chef département</option>
+                <option value="RH">RH</option>
+              </select>
+            </div>
+
+            <div className="col-6 col-sm-4 col-md-3 col-lg-2">
+              <select className="form-select" value={department} onChange={e => setDepartment(e.target.value)}>
+                <option value="">Département</option>
+                {departments.map(dept => (
+                  <option key={dept.id} value={dept.id}>{dept.nom}</option>
+                ))}
               </select>
             </div>
 
             <div className="col-6 col-sm-4 col-md-3 col-lg-2">
               <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
                 <option value="">Statut</option>
-                <option value="en_attente">En attente</option>
-                <option value="validé">Validé</option>
-                <option value="rejeté">Rejeté</option>
-                <option value="approuvé">Approuvé</option>
+                <option value="Actif">Actif</option>
+                <option value="Inactif">Inactif</option>
+                <option value="Congé">Congé</option>
+                <option value="Malade">Malade</option>
               </select>
             </div>
 
@@ -271,13 +357,13 @@ const AbsenceRequestsListPage = () => {
               <input
                 type="text"
                 className="form-control"
-                placeholder="Rechercher..."
+                placeholder="Rechercher par nom ou CIN..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
 
-            {(type || status || searchTerm) && (
+            {(role || department || status || searchTerm) && (
               <div className="col-auto">
                 <button
                   className="btn btn-link text-danger"
@@ -301,72 +387,54 @@ const AbsenceRequestsListPage = () => {
                   <input
                     type="checkbox"
                     className="form-check-input"
-                    checked={selectedRequests.length === absenceRequests.length}
+                    checked={selectedUsers.length === filteredUsers.length}
                     onChange={() => {
-                      if (selectedRequests.length === absenceRequests.length) {
-                        setSelectedRequests([]);
+                      if (selectedUsers.length === filteredUsers.length) {
+                        setSelectedUsers([]);
                       } else {
-                        setSelectedRequests(absenceRequests.map(r => r.id));
+                        setSelectedUsers(filteredUsers.map(u => u.id));
                       }
                     }}
                   />
                 </th>
-                <th>Employé</th>
-                <th>Type</th>
-                <th>Date de début</th>
-                <th>Date de fin</th>
-                <th>Statut</th>
+                <th>Nom</th>
+                <th>Prénom</th>
+                <th>CIN</th>
+                <th>Département</th>
+                <th>Société</th>
                 <th className="text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {currentItems.map((request) => {
-                const user = users.find(u => u.id === request.user_id);
+              {currentItems.map((user) => {
+                const department = departments.find(d => d.id === user.departement_id);
+                const isCurrentUser = currentUser && currentUser.id === user.id;
                 return (
-                  <tr key={request.id}>
+                  <tr key={user.id}>
                     <td>
                       <input
                         type="checkbox"
                         className="form-check-input"
-                        checked={selectedRequests.includes(request.id)}
-                        onChange={() => toggleRequestSelection(request.id)}
+                        checked={selectedUsers.includes(user.id)}
+                        onChange={() => toggleUserSelection(user.id)}
                       />
                     </td>
-                    <td>{user ? `${user.name} ${user.prenom}` : 'Utilisateur inconnu'}</td>
-                    <td>{request.type}</td>
-                    <td>{new Date(request.dateDebut).toLocaleDateString()}</td>
-                    <td>{new Date(request.dateFin).toLocaleDateString()}</td>
-                    <td>
-                    <span
-  className={`badge ${
-    request.statut === 'validé'
-      ? 'bg-success'
-      : request.statut === 'rejeté'
-      ? 'bg-danger'
-      : request.statut === 'approuvé'
-      ? 'bg-primary'      // couleur de votre choix
-      : 'bg-warning'
-  }`}
->                        {request.statut}
-                      </span>
-                    </td>
+                    <td>{user.name}</td>
+                    <td>{user.prenom}</td>
+                    <td>{user.cin}</td>
+                    <td>{department ? department.nom : 'Non assigné'}</td>
+                    <td>{user.societe ? user.societe.nom : 'Non assigné'}</td>
                     <td className="text-end">
                       <div className="d-flex justify-content-end gap-2">
-                        <button
-                          className="btn btn-sm btn-primary me-2"
-                          onClick={() => handleEdit(request.id)}
-                          title="Modifier"
-                        >
-                          <Icon icon="mdi:pencil" />
-                        </button>
-                        <button
-                          className="btn btn-sm btn-danger"
-                          onClick={() => handleDelete(request.id)}
-                          title="Supprimer"
-                        >
-                          <Icon icon="mdi:delete" />
-                        </button>
-                      </div>
+                        {(!roles.includes('Employe')) && (
+                          <button
+                            className="btn btn-sm btn-success me-2"
+                            onClick={() => handleAffectUser(user.id)}                            title="Affecter à mon département et société"
+                          >
+                            <Icon icon="mdi:account-convert" />
+                          </button>
+                        )}
+                        </div>
                     </td>
                   </tr>
                 );
@@ -422,4 +490,4 @@ const AbsenceRequestsListPage = () => {
   );
 };
 
-export default AbsenceRequestsListPage;
+export default TemporaireEmployesPage;

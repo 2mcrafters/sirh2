@@ -4,14 +4,17 @@ import { createUser, updateUser } from '../../Redux/Slices/userSlice';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { fetchDepartments } from '../../Redux/Slices/departementSlice';
+import { fetchSocietes } from '../../Redux/Slices/societeSlice'; // Ajouter l'importation pour fetchSocietes
 
 const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
   const dispatch = useDispatch();
   const { status } = useSelector(state => state.users);
   const { items: departments } = useSelector(state => state.departments);
+  const { items: societes } = useSelector(state => state.societes); // Récupérer les sociétés depuis le store
 
   React.useEffect(() => {
     dispatch(fetchDepartments());
+    dispatch(fetchSocietes()); // Dispatch pour récupérer les sociétés
   }, [dispatch]);
 
   const validationSchema = Yup.object({
@@ -59,6 +62,11 @@ const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
       .required('Le statut est requis')
       .oneOf(['Actif', 'Inactif', 'Congé', 'Malade'], 'Statut invalide') : Yup.string(),
     departement_id: Yup.string().required('Le département est requis'),
+    societe_id: Yup.string().when('typeContrat', {
+      is: 'Permanent',
+      then: schema => schema.required('La société est requise pour un contrat permanent'),
+      otherwise: schema => schema.nullable(),
+    }),
     picture: Yup.mixed()
       .nullable()
       .test('fileSize', 'Le fichier est trop volumineux (max 2MB)', value => {
@@ -89,7 +97,8 @@ const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
         typeContrat: values.typeContrat,
         date_naissance: values.date_naissance,
         statut: isEdit ? values.statut : 'Actif',
-        departement_id: values.departement_id
+        departement_id: values.departement_id ? parseInt(values.departement_id, 10) : null,
+        societe_id: values.societe_id ? parseInt(values.societe_id, 10) : null,
       };
 
       // Handle picture field
@@ -204,13 +213,12 @@ const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
             </div>
             <div className="col-md-6">
               <div className="mb-3">
-                <label htmlFor="nbEnfants" className="form-label">Nombre d'Enfants</label>
+                <label htmlFor="nbEnfants" className="form-label">Nombre d'enfants</label>
                 <Field
                   type="number"
                   name="nbEnfants"
                   id="nbEnfants"
                   className="form-control"
-                  min="0"
                 />
                 <ErrorMessage name="nbEnfants" component="div" className="text-danger" />
               </div>
@@ -258,6 +266,48 @@ const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
           <div className="row">
             <div className="col-md-6">
               <div className="mb-3">
+                <label htmlFor="situationFamiliale" className="form-label">Situation Familiale</label>
+                <Field
+                  as="select"
+                  name="situationFamiliale"
+                  id="situationFamiliale"
+                  className="form-select"
+                >
+                  <option value="Célibataire">Célibataire</option>
+                  <option value="Marié">Marié</option>
+                  <option value="Divorcé">Divorcé</option>
+                </Field>
+                <ErrorMessage name="situationFamiliale" component="div" className="text-danger" />
+              </div>
+            </div>
+            <div className="col-md-6">
+              <div className="mb-3">
+                <label htmlFor="nbEnfants" className="form-label">Nombre d'enfants</label>
+                <Field
+                  type="number"
+                  name="nbEnfants"
+                  id="nbEnfants"
+                  className="form-control"
+                />
+                <ErrorMessage name="nbEnfants" component="div" className="text-danger" />
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-3">
+            <label htmlFor="adresse" className="form-label">Adresse</label>
+            <Field
+              type="text"
+              name="adresse"
+              id="adresse"
+              className="form-control"
+            />
+            <ErrorMessage name="adresse" component="div" className="text-danger" />
+          </div>
+
+          <div className="row">
+            <div className="col-md-6">
+              <div className="mb-3">
                 <label htmlFor="tel" className="form-label">Téléphone</label>
                 <Field
                   type="text"
@@ -276,6 +326,7 @@ const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
                   name="email"
                   id="email"
                   className="form-control"
+                  disabled={isEdit} // Disable email editing
                 />
                 <ErrorMessage name="email" component="div" className="text-danger" />
               </div>
@@ -284,13 +335,15 @@ const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
 
           {!isEdit && (
             <div className="mb-3">
-              <label htmlFor="password" className="form-label">Mot de passe</label>
-              <Field
-                type="password"
-                name="password"
-                id="password"
-                className="form-control"
-              />
+              <label htmlFor="password">Mot de passe</label>
+              <Field type="password" name="password" className="form-control" />
+              <ErrorMessage name="password" component="div" className="text-danger" />
+            </div>
+          )}
+          {isEdit && (
+            <div className="mb-3">
+              <label htmlFor="password">Nouveau mot de passe (laisser vide si inchangé)</label>
+              <Field type="password" name="password" className="form-control" />
               <ErrorMessage name="password" component="div" className="text-danger" />
             </div>
           )}
@@ -305,10 +358,10 @@ const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
                   id="role"
                   className="form-select"
                 >
-                  {!isEdit && <option value="">Sélectionner un rôle</option>}
+                  <option value="">Sélectionner un rôle</option>
                   <option value="Employe">Employé</option>
                   <option value="Chef_Dep">Chef de Département</option>
-                  <option value="RH">Ressources Humaines</option>
+                  <option value="RH">RH</option>
                 </Field>
                 <ErrorMessage name="role" component="div" className="text-danger" />
               </div>
@@ -364,22 +417,41 @@ const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
             )}
           </div>
 
-          <div className="mb-3">
-            <label htmlFor="departement_id" className="form-label">Département</label>
-            <Field
-              as="select"
-              name="departement_id"
-              id="departement_id"
-              className="form-select"
-            >
-              <option value="">Sélectionner un département</option>
-              {departments.map(department => (
-                <option key={department.id} value={department.id}>
-                  {department.nom}
-                </option>
-              ))}
-            </Field>
-            <ErrorMessage name="departement_id" component="div" className="text-danger" />
+          <div className="row">
+            <div className="col-md-6">
+              <div className="mb-3">
+                <label htmlFor="departement_id" className="form-label">Département</label>
+                <Field
+                  as="select"
+                  name="departement_id"
+                  id="departement_id"
+                  className="form-select"
+                >
+                  <option value="">Sélectionner un département</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.id}>{dept.nom}</option>
+                  ))}
+                </Field>
+                <ErrorMessage name="departement_id" component="div" className="text-danger" />
+              </div>
+            </div>
+            <div className="col-md-6">
+              <div className="mb-3">
+                <label htmlFor="societe_id" className="form-label">Société</label>
+                <Field
+                  as="select"
+                  name="societe_id"
+                  id="societe_id"
+                  className="form-select"
+                >
+                  <option value="">Sélectionner une société</option>
+                  {societes.map(soc => (
+                    <option key={soc.id} value={soc.id}>{soc.nom}</option>
+                  ))}
+                </Field>
+                <ErrorMessage name="societe_id" component="div" className="text-danger" />
+              </div>
+            </div>
           </div>
 
           <div className="mb-3">
@@ -414,4 +486,4 @@ const UserForm = ({ initialValues = {}, isEdit = false, onSuccess }) => {
   );
 };
 
-export default UserForm; 
+export default UserForm;

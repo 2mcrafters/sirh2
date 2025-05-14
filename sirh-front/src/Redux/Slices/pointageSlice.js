@@ -87,6 +87,30 @@ export const deletePointages = createAsyncThunk(
   }
 );
 
+export const validerPointage = createAsyncThunk(
+  'pointages/validerPointage',
+  async (id, { rejectWithValue }) => {
+    try {
+      const response = await api.put(`${API_ENDPOINTS.POINTAGES.BASE}/${id}/valider`);
+      return response.data.pointage; // Assurez-vous que le backend renvoie le pointage mis à jour
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
+export const invaliderPointage = createAsyncThunk(
+  'pointages/invaliderPointage',
+  async (id, { rejectWithValue }) => {
+    try {
+      const response = await api.put(`${API_ENDPOINTS.POINTAGES.BASE}/${id}/invalider`);
+      return response.data.pointage; // Assurez-vous que le backend renvoie le pointage mis à jour
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
 const pointageSlice = createSlice({
   name: 'pointages',
   initialState: {
@@ -148,8 +172,38 @@ const pointageSlice = createSlice({
       .addCase(deletePointages.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
+      })
+      // Valider pointage
+      .addCase(validerPointage.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(validerPointage.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        const index = state.items.findIndex(p => p.id === action.payload.id);
+        if (index !== -1) {
+          state.items[index] = action.payload;
+        }
+      })
+      .addCase(validerPointage.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
+      })
+      // Invalider pointage
+      .addCase(invaliderPointage.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(invaliderPointage.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        const index = state.items.findIndex(p => p.id === action.payload.id);
+        if (index !== -1) {
+          state.items[index] = action.payload;
+        }
+      })
+      .addCase(invaliderPointage.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
       });
   }
 });
 
-export default pointageSlice.reducer; 
+export default pointageSlice.reducer;

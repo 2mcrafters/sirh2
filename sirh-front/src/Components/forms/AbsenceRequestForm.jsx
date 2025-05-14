@@ -74,8 +74,8 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
           formData.append('justification', values.justification);
         } else if (values.justification === null || values.justification === '') {
           formData.append('justification', '');
-        } else if (values.justification) {
-          formData.append('justification', values.justification);
+        } else if (values.justification && !(values.justification instanceof File)) {
+            formData.append('justification', values.justification);
         }
 
         // Log FormData contents
@@ -128,6 +128,10 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
 
         if (values.justification instanceof File) {
           console.log('Adding file to FormData:', values.justification);
+          formData.append('justification', values.justification);
+        } else if (values.justification === null || values.justification === '') {
+          formData.append('justification', '');
+        } else if (values.justification) {
           formData.append('justification', values.justification);
         }
 
@@ -194,12 +198,7 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
                 <div className="col-md-6">
                   <div className="mb-3">
                     <label htmlFor="type" className="form-label">Type d'absence</label>
-                    <Field
-                      as="select"
-                      name="type"
-                      id="type"
-                      className="form-select"
-                    >
+                    <Field as="select" name="type" className="form-control">
                       <option value="Congé">Congé</option>
                       <option value="maladie">Maladie</option>
                       <option value="autre">Autre</option>
@@ -207,7 +206,22 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
                     <ErrorMessage name="type" component="div" className="text-danger" />
                   </div>
                 </div>
-              </div>
+                <div className="col-md-6">
+                  {isEdit && role && !role.includes('Employe') && (
+                    <div className="mb-3">
+                      <label htmlFor="statut" className="form-label">Statut</label>
+                      <Field as="select" name="statut" className="form-control">
+                        <option value="en_attente">En attente</option>
+                        <option value="rejeté">Rejeté</option>
+                        <option value="validé">Validé</option>
+                        <option value="approuvé">Approuvé</option>
+
+                      </Field>
+                      <ErrorMessage name="statut" component="div" className="text-danger" />
+                    </div>
+                  )}
+                </div>
+                </div>
 
               <div className="row">
                 <div className="col-md-6">
@@ -246,6 +260,7 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
                       id="motif"
                       className="form-control"
                       rows="3"
+                      placeholder="Entrez le motif de votre absence"
                     />
                     <ErrorMessage name="motif" component="div" className="text-danger" />
                   </div>
@@ -253,7 +268,7 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
               </div>
 
               <div className="row">
-                <div className="col-12">
+                <div className="col-md-6">
                   <div className="mb-3">
                     <label htmlFor="justification" className="form-label">Justification</label>
                     <input
@@ -261,22 +276,13 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
                       name="justification"
                       id="justification"
                       className="form-control"
-                      accept=".jpg,.jpeg,.png,.pdf"
                       onChange={(event) => {
-                        const file = event.currentTarget.files[0];
-                        if (file) {
-                          console.log('Selected file:', file);
-                          setFieldValue("justification", file);
-                        } else {
-                          setFieldValue("justification", null);
-                        }
+                        setFieldValue("justification", event.currentTarget.files[0]);
                       }}
                     />
-                    {initialValues.justification && !values.justification && (
+                    {values.justification && typeof values.justification === 'string' && (
                       <div className="mt-2">
-                        <small className="text-muted">
-                          Fichier actuel: {initialValues.justification}
-                        </small>
+                        <span>Fichier actuel: {values.justification}</span>
                       </div>
                     )}
                     <ErrorMessage name="justification" component="div" className="text-danger" />
@@ -284,34 +290,12 @@ const AbsenceRequestForm = ({ initialValues = {}, isEdit = false, onSuccess }) =
                 </div>
               </div>
 
-              {(isEdit && (role.includes("RH") || role.includes("Chef_Dep"))) && (
-                <div className="mb-3">
-                  <label htmlFor="statut" className="form-label">Statut</label>
-                  <Field
-                    as="select"
-                    name="statut"
-                    id="statut"
-                    className="form-select"
-                  >
-                    <option value="en_attente">En attente</option>
-                    <option value="validé">Validé</option>
-                    <option value="rejeté">Rejeté</option>
-                  </Field>
-                  <ErrorMessage name="statut" component="div" className="text-danger" />
+              <div className="row">
+                <div className="col-12">
+                  <button type="submit" disabled={isSubmitting} className="btn btn-primary">
+                    {isSubmitting ? 'Enregistrement...' : 'Soumettre'}
+                  </button>
                 </div>
-              )}
-
-              <div className="text-end">
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={isSubmitting || status === 'loading' || (!isEdit && authLoading)}
-                >
-                  {isSubmitting || status === 'loading' ? (
-                    <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                  ) : null}
-                  {isEdit ? 'Modifier' : 'Créer'}
-                </button>
               </div>
             </Form>
           )}

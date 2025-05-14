@@ -14,6 +14,9 @@ export const API_ENDPOINTS = {
     BASE: `${API_URL}/employes`,
     BY_ID: (id) => `${API_URL}/employes/${id}`,
   },
+  USERSTEMP:{
+    BASE: `${API_URL}/employes/temp`,
+  },
 
   // Departments
   DEPARTMENTS: {

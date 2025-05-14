@@ -12,11 +12,13 @@ use App\Http\Controllers\AbsenceRequestExcelController;
 use App\Http\Controllers\DepartementExcelController;
 use App\Http\Controllers\PointageExcelController;
 use App\Http\Controllers\UserExcelController;
+use App\Http\Controllers\SocieteController;
 use App\Http\Middleware\RoleMiddleware;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/employes', [UserController::class, 'store']);
+
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -26,9 +28,18 @@ Route::get('/departements', [DepartementController::class, 'index']);
 Route::post('/departements', [DepartementController::class, 'store']);
 Route::put('/departements', [DepartementController::class, 'update']);
 Route::delete('/departements', [DepartementController::class, 'destroy']);
+
+Route::get('/societes', [SocieteController::class, 'index']);
+Route::post('/societes', [SocieteController::class, 'store']);
+Route::put('/societes', [SocieteController::class, 'update']);
+Route::delete('/societes', [SocieteController::class, 'destroy']);
+
 Route::get('/employes', [UserController::class, 'index']);
 Route::put('/employes/update/{id}', [UserController::class, 'update']);
-Route::delete('/employes', [UserController::class, 'destroy']); 
+Route::put('/users/affecter/{id}', [UserController::class, 'updateSocieteDepartement']);
+Route::delete('/employes', [UserController::class, 'destroy']);
+Route::get('/employes/temp', [UserController::class, 'EmployeTemp']);
+
 Route::get('/absences', [AbsenceRequestController::class, 'index']);
 Route::post('/absences', [AbsenceRequestController::class, 'store']);
 Route::match(['post', 'put'], '/absences/update/{id}', [AbsenceRequestController::class, 'update']);
@@ -37,6 +48,8 @@ Route::get('/pointages', [PointageController::class, 'index']);
 Route::post('/pointages', [PointageController::class, 'store']);
 Route::put('/pointages', [PointageController::class, 'update']);
 Route::delete('/pointages', [PointageController::class, 'destroy']);
+Route::put('/pointages/{id}/valider', [PointageController::class, 'valider']);
+Route::put('/pointages/{id}/invalider', [PointageController::class, 'invalider']);
 });
 // imports
 

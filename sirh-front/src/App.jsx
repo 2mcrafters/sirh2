@@ -18,6 +18,9 @@ import AddPointagePage from './Pages/AddPointagePage'
 import EditPointagePage from './Pages/EditPointagePage'
 import PrivateRoute from './PrivateRoute'
 import NotFound from './Pages/NotFound'
+import SocietesListPage from './Pages/SocietesListPage'; // Ajout de l'import pour la page des sociétés
+import TemporaireEmployesPage from './Pages/TemporaireEmployesPage'; // Ajout de l'import pour la page des sociétés
+
 import "./degrade.css"
 
 
@@ -25,11 +28,11 @@ import "./degrade.css"
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchUsers } from './Redux/Slices/userSlice';
+import { fetchUsersTemp } from './Redux/Slices/userSlice';
 import { fetchDepartments } from './Redux/Slices/departementSlice';
 import { fetchAbsenceRequests } from './Redux/Slices/absenceRequestSlice';
 import { fetchPointages } from './Redux/Slices/pointageSlice';
 import { fetchPresenceStats } from './Redux/Slices/presenceStatsSlice';
-
 
 function App() {
 
@@ -39,6 +42,7 @@ function App() {
   useEffect(() => {
     if (auth.isSuccess && auth.token) {
       dispatch(fetchUsers());
+      dispatch(fetchUsersTemp());
       dispatch(fetchDepartments());
       dispatch(fetchAbsenceRequests());
       dispatch(fetchPointages());
@@ -69,8 +73,10 @@ function App() {
           <Route path="users" element={<UsersListPage />} />
         <Route path="users/add" element={<UserFormPage />} />
         <Route path="users/:id/edit" element={<UserFormPage />} />
+        <Route path="users/temp" element={<TemporaireEmployesPage />} />
        
-          
+        <Route path="societes" element={<SocietesListPage />} />
+    
           {/* Department routes */}
           <Route path="/departments" element={<DepartmentsListPage />} />
           <Route path="/departments/add" element={<BulkAddDepartmentPage />} />

@@ -15,27 +15,46 @@ class UserController extends Controller
      * Display a listing of the resource.
      */
     public function index() {
-        // $users = User::all();
-        $user = auth()->user(); 
+        $authUser = auth()->user();
+        $societeId = $authUser->societe_id; 
 
-        if ($user->hasRole('Employe')) {
-            
-            $users = [$user]; 
-        } elseif ($user->hasRole('Chef_Dep')) {
-            
-            $departementId = $user->departement_id;  
-            $users = User::where('departement_id', $departementId)->get();  
-        } elseif ($user->hasRole('RH')) {
-            
-            $users = User::all();
+        if ($authUser->hasRole('Employe')) {
+            // Employé : Ne voir que lui-même
+            $authUser->load('societe');
+            $users = [$authUser];
+
+        } elseif ($authUser->hasAnyRole(['Chef_Dep', 'Chef_Projet'])) {
+            // Chef_Dep / Chef_Projet : Voir les employés du même département ET de la même société
+            $departementId = $authUser->departement_id;
+
+            $users = User::with('societe')
+                         ->where('departement_id', $departementId)
+                         ->where('societe_id', $societeId)
+                         ->get();
+
+        } elseif ($authUser->hasRole('RH')) {
+            // RH : Voir tous les employés sans restriction
+            $users = User::with('societe')->where('societe_id', $societeId)->get();
         } else {
-            
-            return response()->json(['message' => 'Role non autorisé'], 403);
+            return response()->json(['message' => 'Rôle non autorisé'], 403);
         }
+
         foreach ($users as $user) {
             $user->profile_picture_url = $user->profile_picture_url;
         }
-        return $users;
+
+        return response()->json($users);
+    }
+    
+    public function EmployeTemp(){
+        $authUser = auth()->user();
+        // $societeId = $authUser->societe_id; 
+        
+        $users = User::with('societe')
+        ->where('typeContrat', "Temporaire")
+        ->get();
+        return response()->json($users);
+
     }
 
     /**
@@ -66,6 +85,7 @@ class UserController extends Controller
             'date_naissance' => 'required|date',
             'statut' => 'required|in:Actif,Inactif,Congé,Malade',
             'departement_id' => 'required|exists:departements,id',
+            'societe_id' => 'required_if:typeContrat,Permanent|nullable|exists:societes,id',
             'picture' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ];
     
@@ -125,6 +145,7 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
+        $user->load('societe');
         $user->profile_picture_url = $user->profile_picture_url;
         return $user;
     }
@@ -160,6 +181,7 @@ class UserController extends Controller
         'date_naissance' => 'sometimes|date',
         'statut' => 'sometimes|in:Actif,Inactif,Congé,Malade',
         'departement_id' => 'sometimes|exists:departements,id',
+        'societe_id' => 'sometimes|required_if:typeContrat,Permanent|nullable|exists:societes,id',
         'picture' => 'sometimes|file|image|mimes:jpeg,png,jpg,gif|max:2048',
     ];
 
@@ -199,6 +221,21 @@ class UserController extends Controller
     return response()->json(['message' => 'Utilisateur mis à jour avec succès', 'user' => $user]);
 }
 
+    public function updateSocieteDepartement(Request $request, $id)
+    {
+        $authUser = auth()->user();
+
+        if (!$authUser->hasAnyRole(['RH','Chef_Dep', 'Chef_Projet'])) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $user = User::findOrFail($id);
+        $user->departement_id = $authUser->departement_id;
+        $user->societe_id = $authUser->societe_id;
+        $user->save();
+
+        return response()->json(['message' => 'Employé affecté avec succès']);
+    }
 
     /**
      * Remove the specified resource from storage.

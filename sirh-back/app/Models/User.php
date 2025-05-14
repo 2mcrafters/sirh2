@@ -24,7 +24,7 @@ class User extends Authenticatable
         'cin', 'rib', 'situationFamiliale', 'nbEnfants', 'adresse',
         'name',"password", 'prenom', 'date_naissance', 'tel', 'email', 'role',
 
-        'statut', 'typeContrat', 'departement_id', 'picture'
+        'statut', 'typeContrat', 'departement_id', 'picture', 'societe_id'
     ];
 
 
@@ -55,6 +55,10 @@ class User extends Authenticatable
 
     public function absenceRequests() {
         return $this->hasMany(AbsenceRequest::class);
+    }
+
+    public function societe() {
+        return $this->belongsTo(Societe::class);
     }
     /**
      * Get the attributes that should be cast.

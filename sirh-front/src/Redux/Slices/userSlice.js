@@ -18,7 +18,21 @@ export const fetchUsers = createAsyncThunk(
     }
   }
 );
-
+export const fetchUsersTemp = createAsyncThunk(
+  'users/fetchUsersTemp',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get(API_ENDPOINTS.USERSTEMP.BASE, {
+        
+      });
+      console.log(response.data);
+      
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
 export const createUser = createAsyncThunk(
   'users/createUser',
   async (userData, { rejectWithValue }) => {
@@ -39,7 +53,8 @@ export const createUser = createAsyncThunk(
         typeContrat: userData.typeContrat,
         date_naissance: userData.date_naissance,
         statut: userData.statut,
-        departement_id: parseInt(userData.departement_id)
+        departement_id: parseInt(userData.departement_id),
+        societe_id: userData.societe_id ? parseInt(userData.societe_id) : null // Ajouter societe_id
       };
 
       // Handle picture upload
@@ -71,7 +86,6 @@ export const createUser = createAsyncThunk(
     }
   }
 );
-
 export const updateUser = createAsyncThunk(
   'users/updateUser',
   async ({ id, ...values }, { rejectWithValue }) => {
@@ -97,10 +111,6 @@ export const updateUser = createAsyncThunk(
     }
   }
 );
-
-
-
-
 export const deleteUsers = createAsyncThunk(
   'users/deleteUsers',
   async (ids, { rejectWithValue }) => {
@@ -112,13 +122,26 @@ export const deleteUsers = createAsyncThunk(
     }
   }
 );
+export const affectUser = createAsyncThunk(
+  'users/affectUser',
+  async ({ userId }, { rejectWithValue }) => {
+    try {
+      const response = await api.put(`/users/affecter/${userId}`);
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
 
 const userSlice = createSlice({
   name: 'users',
   initialState: {
     items: [],
     status: 'idle',
-    error: null
+    error: null,
+    UserTemp:[]
   },
   reducers: {},
   extraReducers: (builder) => {
@@ -132,6 +155,17 @@ const userSlice = createSlice({
         state.items = action.payload;
       })
       .addCase(fetchUsers.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
+      })
+      .addCase(fetchUsersTemp.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(fetchUsersTemp.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.UserTemp = action.payload;
+      })
+      .addCase(fetchUsersTemp.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
       })
@@ -173,8 +207,22 @@ const userSlice = createSlice({
       .addCase(deleteUsers.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
-      });
+      })
+      .addCase(affectUser.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(affectUser.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        const index = state.items.findIndex(u => u.id === action.payload.id);
+        if (index !== -1) {
+          state.items[index] = action.payload;
+        }
+      })
+      .addCase(affectUser.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
+      })
   }
 });
 
-export default userSlice.reducer; 
+export default userSlice.reducer;
